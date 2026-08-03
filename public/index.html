@@ -2,185 +2,200 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Online Zombie Game</title>
+    <title>Zombie Multiplayer Game</title>
     <style>
-        body { background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; font-family: Arial; margin: 0; height: 100vh; justify-content: center; }
-        canvas { background: #2c3e50; border: 3px solid #7f8c8d; cursor: crosshair; display: none; }
-        
-        .menu-box { background: rgba(0,0,0,0.9); padding: 30px; border-radius: 10px; text-align: center; border: 2px solid #555; width: 350px; }
-        #join-menu { display: none; }
-        #lobby-menu { display: none; }
-        #death-menu { display: none; }
-        
-        button { padding: 12px 24px; margin: 10px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; width: 100%; }
-        .btn-primary { background: #3498db; color: white; }
-        .btn-primary:hover { background: #2980b9; }
-        .btn-success { background: #2ecc71; color: white; }
-        .btn-success:hover { background: #27ae60; }
-        .btn-start { background: #e67e22; color: white; font-size: 18px; margin-top: 20px; }
-        .btn-start:hover { background: #d35400; }
-        
-        input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; text-align: center; margin-bottom: 10px; width: 90%; text-transform: uppercase; }
-
-        .mage { background: #9b59b6; color: white; width: 30%; display: inline-block; }
-        .melee { background: #95a5a6; color: black; width: 30%; display: inline-block; }
-        .marksman { background: #f1c40f; color: black; width: 30%; display: inline-block; }
-
-        #shop-menu {
-            display: none;
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+        }
+        canvas {
+            background-color: #222;
+            border: 2px solid #555;
+            display: block;
+        }
+        .screen {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            padding: 30px;
-            border: 3px solid #f1c40f;
-            border-radius: 10px;
-            text-align: center;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             z-index: 10;
         }
-
-        .shop-btn { background: #2ecc71; color: white; display: block; width: 100%; }
-        .shop-btn:hover { background: #27ae60; }
-        
-        #hud { display: none; gap: 30px; font-size: 18px; margin-bottom: 10px; }
-        #player-list { margin: 15px 0; background: #222; padding: 10px; border-radius: 5px; text-align: left; font-size: 14px; }
+        .hidden {
+            display: none !important;
+        }
+        input, button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+        }
+        input {
+            background: #fff;
+            color: #000;
+        }
+        button {
+            background: #27ae60;
+            color: white;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #2ecc71;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 5;
+            pointer-events: none;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+        }
+        #shop {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            z-index: 5;
+        }
+        #shop button {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin: 2px;
+        }
     </style>
 </head>
 <body>
-
-    <!-- 1. Main Menu -->
-    <div id="main-menu" class="menu-box">
-        <h2>Zombie Survival</h2>
-        <button class="btn-primary" onclick="showCreateParty()">Create Party</button>
-        <button class="btn-success" onclick="showJoinMenu()">Join Party</button>
-    </div>
-
-    <!-- 2. Join Party Menu -->
-    <div id="join-menu" class="menu-box">
-        <h2>Join a Party</h2>
-        <input type="text" id="party-code-input" placeholder="Enter Code" maxlength="4">
-        <button class="btn-success" onclick="joinParty()">Enter Party</button>
-        <button style="background:#e74c3c; color:white;" onclick="backToMain()">Back</button>
-        <p id="error-msg" style="color: #e74c3c; margin-top: 10px;"></p>
-    </div>
-
-    <!-- 3. Lobby Menu (Party Room & Class Selection) -->
-    <div id="lobby-menu" class="menu-box" style="width: 400px;">
-        <h2>Party Code: <span id="display-code" style="color: #f1c40f;">----</span></h2>
-        <p style="font-size: 13px; color: #aaa;">Give this code to your friend!</p>
-        
-        <div id="player-list">
-            <strong>Players in Party:</strong>
-            <div id="players-container">Loading...</div>
+    <div id="game-container">
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            Wave: <span id="wave-display">1</span> | Money: $<span id="money-display">0</span> | HP: <span id="hp-display">100</span>
         </div>
 
-        <p>Choose Your Class:</p>
-        <div style="display: flex; justify-content: space-between;">
-            <button class="mage" onclick="selectClass('mage')">Mage</button>
-            <button class="melee" onclick="selectClass('melee')">Melee</button>
-            <button class="marksman" onclick="selectClass('marksman')">Marksman</button>
+        <!-- Shop -->
+        <div id="shop" class="hidden">
+            <h4>Shop (Between Waves)</h4>
+            <button onclick="buyItem('health')">Buy Health ($50)</button>
+            <button onclick="buyItem('damage')">Buy Damage ($100)</button>
+            <button onclick="buyItem('speed')">Buy Speed ($75)</button>
         </div>
 
-        <button class="btn-start" onclick="startGame()">Start Game</button>
-    </div>
+        <!-- Canvas -->
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-    <!-- 4. Death Menu -->
-    <div id="death-menu" class="menu-box">
-        <h2 style="color: #e74c3c;">YOU DIED</h2>
-        <p>The zombies got you!</p>
-        <button class="btn-primary" onclick="location.reload()">Main Menu</button>
-    </div>
+        <!-- Main Menu Screen -->
+        <div id="main-menu" class="screen">
+            <h2>Zombie Multiplayer Survival</h2>
+            <button onclick="createParty()">Create Party</button>
+            <br>
+            <input type="text" id="party-code-input" placeholder="Enter 4-Letter Code" maxlength="4">
+            <br>
+            <button onclick="joinParty()" style="background: #2980b9;">Join Party</button>
+            <p id="error-msg" style="color: #e74c3c; margin-top: 10px;"></p>
+        </div>
 
-    <!-- HUD Information -->
-    <div id="hud">
-        <h3 id="wave-display">Wave: 1</h3>
-        <h3 id="money-display">Money: $0</h3>
-        <h3 id="party-hud-code" style="color: #f1c40f;">Code: ----</h3>
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="screen hidden">
+            <h2 id="party-code-display">Party Code: </h2>
+            <p>Give this code to your friend!</p>
+            <div style="background: #222; padding: 15px; border-radius: 5px; width: 300px; margin-bottom: 15px;">
+                <h4>Players in Party:</h4>
+                <ul id="player-list" style="list-style: none; padding: 0;"></ul>
+            </div>
+            <h3>Choose Your Class:</h3>
+            <div>
+                <button onclick="selectClass('mage')" style="background: #9b59b6;">Mage</button>
+                <button onclick="selectClass('melee')" style="background: #95a5a6;">Melee</button>
+                <button onclick="selectClass('marksman')" style="background: #f1c40f; color: #000;">Marksman</button>
+            </div>
+            <br>
+            <button id="start-game-btn" onclick="startGame()" class="hidden" style="background: #e67e22;">Start Game</button>
+        </div>
     </div>
-
-    <!-- Upgrade Shop Overlay -->
-    <div id="shop-menu">
-        <h2>WAVE CLEARED! SHOP OPEN</h2>
-        <p>Your Money: $<span id="shop-money">0</span></p>
-        <button class="shop-btn" onclick="buy('health')">Buy Full Heal ($50)</button>
-        <button class="shop-btn" onclick="buy('damage')">Upgrade Damage ($100)</button>
-        <button class="shop-btn" onclick="buy('speed')">Upgrade Speed ($75)</button>
-        <p style="color: #f1c40f; font-size: 14px; margin-top: 15px;">Next wave starts automatically soon...</p>
-    </div>
-
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
-        const mainMenu = document.getElementById('main-menu');
-        const joinMenu = document.getElementById('join-menu');
-        const lobbyMenu = document.getElementById('lobby-menu');
-        const deathMenu = document.getElementById('death-menu');
-        const displayCode = document.getElementById('display-code');
-        const errorMsg = document.getElementById('error-msg');
-        const codeInput = document.getElementById('party-code-input');
-        const playersContainer = document.getElementById('players-container');
 
+        const mainMenu = document.getElementById('main-menu');
+        const lobbyScreen = document.getElementById('lobby-screen');
         const hud = document.getElementById('hud');
-        const partyHudCode = document.getElementById('party-hud-code');
-        const waveDisp = document.getElementById('wave-display');
-        const moneyDisp = document.getElementById('money-display');
-        
-        const shopMenu = document.getElementById('shop-menu');
-        const shopMoney = document.getElementById('shop-money');
-        
+        const shop = document.getElementById('shop');
+        const partyCodeDisplay = document.getElementById('party-code-display');
+        const playerList = document.getElementById('player-list');
+        const errorMsg = document.getElementById('error-msg');
+        const startGameBtn = document.getElementById('start-game-btn');
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        let currentPartyCode = '';
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], wave: 1, waveActive: false };
+        let myId = null;
 
-        function showCreateParty() {
+        // Sprites
+        const playerSprite = new Image();
+        playerSprite.src = 'https://cdn-icons-png.flaticon.com/512/3094/3094901.png';
+
+        const zombieSprite = new Image();
+        zombieSprite.src = 'https://cdn-icons-png.flaticon.com/512/2904/2904859.png';
+
+        function createParty() {
             socket.emit('createParty');
         }
 
-        function showJoinMenu() {
-            mainMenu.style.display = 'none';
-            joinMenu.style.display = 'block';
-        }
-
-        function backToMain() {
-            joinMenu.style.display = 'none';
-            mainMenu.style.display = 'block';
-            errorMsg.innerText = '';
-        }
-
         function joinParty() {
-            const code = codeInput.value.trim().toUpperCase();
-            if (code.length === 4) {
-                socket.emit('joinParty', code);
-            } else {
-                errorMsg.innerText = 'Please enter a valid 4-character code.';
-            }
+            const code = document.getElementById('party-code-input').value;
+            socket.emit('joinParty', code);
         }
 
-        function selectClass(playerClass) {
-            socket.emit('selectClass', playerClass);
+        function selectClass(cls) {
+            socket.emit('selectClass', cls);
         }
 
         function startGame() {
             socket.emit('startGame');
         }
 
+        function buyItem(item) {
+            socket.emit('buy', item);
+        }
+
         socket.on('partyCreated', (code) => {
-            currentPartyCode = code.toUpperCase();
-            displayCode.innerText = currentPartyCode;
-            mainMenu.style.display = 'none';
-            lobbyMenu.style.display = 'block';
+            myId = socket.id;
+            mainMenu.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            partyCodeDisplay.innerText = `Party Code: ${code}`;
+            startGameBtn.classList.remove('hidden');
         });
 
         socket.on('partyJoined', (code) => {
-            currentPartyCode = code.toUpperCase();
-            displayCode.innerText = currentPartyCode;
-            joinMenu.style.display = 'none';
-            lobbyMenu.style.display = 'block';
+            myId = socket.id;
+            mainMenu.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            partyCodeDisplay.innerText = `Party Code: ${code}`;
         });
 
         socket.on('partyError', (msg) => {
@@ -188,112 +203,108 @@
         });
 
         socket.on('lobbyUpdate', (players) => {
-            let html = '';
+            playerList.innerHTML = '';
             for (let id in players) {
                 let p = players[id];
-                let isMe = (id === socket.id) ? ' (You)' : '';
-                html += `<div>Player: ${id.substring(0,4)}... - Class: <b>${p.class.toUpperCase()}</b>${isMe}</div>`;
+                let li = document.createElement('li');
+                li.innerText = `Player (${id === socket.id ? 'You' : 'Friend'}) - Class: ${p.class.toUpperCase()}`;
+                playerList.appendChild(li);
             }
-            playersContainer.innerHTML = html;
         });
 
         socket.on('gameStarted', () => {
-            lobbyMenu.style.display = 'none';
-            hud.style.display = 'flex';
-            partyHudCode.innerText = `Code: ${currentPartyCode}`;
-            canvas.style.display = 'block';
-        });
-
-        function buy(item) {
-            socket.emit('buy', item);
-        }
-
-        const keys = { up: false, down: false, left: false, right: false };
-
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'KeyW') keys.up = true;
-            if (e.code === 'KeyS') keys.down = true;
-            if (e.code === 'KeyA') keys.left = true;
-            if (e.code === 'KeyD') keys.right = true;
-        });
-
-        window.addEventListener('keyup', (e) => {
-            if (e.code === 'KeyW') keys.up = false;
-            if (e.code === 'KeyS') keys.down = false;
-            if (e.code === 'KeyA') keys.left = false;
-            if (e.code === 'KeyD') keys.right = false;
-        });
-
-        setInterval(() => {
-            if (canvas.style.display !== 'none') {
-                socket.emit('move', keys);
-            }
-        }, 1000/60);
-
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            socket.emit('shoot', { x: mouseX, y: mouseY });
+            lobbyScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
         });
 
         socket.on('stateUpdate', (state) => {
-            waveDisp.innerText = `Wave: ${state.wave}`;
+            gameState = state;
+        });
 
-            let myPlayer = state.players[socket.id];
-            if (myPlayer) {
-                moneyDisp.innerText = `Money: $${myPlayer.money}`;
-                shopMoney.innerText = myPlayer.money;
+        const keys = {};
+        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
-                if (myPlayer.hp <= 0) {
-                    canvas.style.display = 'none';
-                    hud.style.display = 'none';
-                    shopMenu.style.display = 'none';
-                    deathMenu.style.display = 'block';
-                    return;
+        setInterval(() => {
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            let input = {
+                up: keys['w'] || keys['arrowup'],
+                down: keys['s'] || keys['arrowdown'],
+                left: keys['a'] || keys['arrowleft'],
+                right: keys['d'] || keys['arrowright']
+            };
+            socket.emit('move', input);
+        }, 1000 / 60);
+
+        canvas.addEventListener('click', (e) => {
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            const rect = canvas.getBoundingClientRect();
+            const target = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            socket.emit('shoot', target);
+        });
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (lobbyScreen.classList.contains('hidden')) {
+                gameState.pickups.forEach(p => {
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                ctx.fillStyle = '#f39c12';
+                gameState.bullets.forEach(b => {
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                gameState.zombies.forEach(z => {
+                    if (zombieSprite.complete && zombieSprite.naturalHeight !== 0) {
+                        ctx.drawImage(zombieSprite, z.x, z.y, z.size, z.size);
+                    } else {
+                        ctx.fillStyle = z.type === 'tank' ? '#27ae60' : (z.type === 'runner' ? '#e67e22' : '#e74c3c');
+                        ctx.fillRect(z.x, z.y, z.size, z.size);
+                    }
+                });
+
+                for (let id in gameState.players) {
+                    let p = gameState.players[id];
+                    if (playerSprite.complete && playerSprite.naturalHeight !== 0) {
+                        ctx.drawImage(playerSprite, p.x, p.y, p.size, p.size);
+                    } else {
+                        ctx.fillStyle = p.color;
+                        ctx.fillRect(p.x, p.y, p.size, p.size);
+                    }
+
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(p.x, p.y - 8, p.size, 4);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(p.x, p.y - 8, p.size * (p.hp / p.maxHp), 4);
+                }
+
+                document.getElementById('wave-display').innerText = gameState.wave;
+                if (gameState.players[socket.id]) {
+                    document.getElementById('money-display').innerText = gameState.players[socket.id].money;
+                    document.getElementById('hp-display').innerText = Math.max(0, gameState.players[socket.id].hp);
+                }
+
+                if (!gameState.waveActive) {
+                    shop.classList.remove('hidden');
+                } else {
+                    shop.classList.add('hidden');
                 }
             }
 
-            if (!state.waveActive) {
-                shopMenu.style.display = 'block';
-            } else {
-                shopMenu.style.display = 'none';
-            }
+            requestAnimationFrame(draw);
+        }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            state.pickups.forEach(p => {
-                ctx.fillStyle = '#2ecc71'; 
-                ctx.fillRect(p.x, p.y, 20, 20);
-                ctx.fillStyle = 'white';
-                ctx.fillText("+", p.x + 6, p.y + 14);
-            });
-
-            for (let id in state.players) {
-                let p = state.players[id];
-                if (p.hp <= 0) continue;
-
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, p.size, p.size);
-                
-                ctx.fillStyle = 'red';
-                ctx.fillRect(p.x, p.y - 10, p.size, 5);
-                ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 5);
-            }
-
-            state.zombies.forEach(z => {
-                ctx.fillStyle = z.color;
-                ctx.fillRect(z.x, z.y, z.size, z.size);
-            });
-
-            state.bullets.forEach(b => {
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-        });
+        requestAnimationFrame(draw);
     </script>
 </body>
 </html>
