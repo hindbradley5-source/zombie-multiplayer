@@ -8,9 +8,9 @@ app.use(express.static('public'));
 const rooms = {};
 
 const classData = {
-    mage: { color: '#9b59b6', speed: 4, maxHp: 80, bulletSpeed: 6, bulletSize: 15, damage: 50 },
+    mage: { color: '#9b59b6', speed: 4, maxHp: 80, bulletSpeed: 6, bulletSize: 15, damage: 50, mana: 100, maxMana: 100, manaCost: 25 },
     melee: { color: '#95a5a6', speed: 6, maxHp: 150, bulletSpeed: 15, bulletSize: 5, damage: 100, range: 10 },
-    marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 25 }
+    marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 25, ammo: 12, maxAmmo: 12, reloading: false }
 };
 
 function generatePartyCode() {
@@ -33,7 +33,7 @@ io.on('connection', (socket) => {
             zombies: [],
             pickups: [],
             wave: 1,
-            zombiesToSpawn: 15, // Increased starting zombies
+            zombiesToSpawn: 15,
             waveActive: false,
             gameStarted: false
         };
@@ -43,7 +43,7 @@ io.on('connection', (socket) => {
         const stats = classData['marksman'];
         rooms[code].players[socket.id] = {
             x: 400, y: 300,
-            size: 35, // Slightly larger for sprites
+            size: 35,
             hp: stats.maxHp,
             money: 0,
             class: 'marksman',
@@ -93,6 +93,12 @@ io.on('connection', (socket) => {
             room.players[socket.id].bulletSpeed = stats.bulletSpeed;
             room.players[socket.id].bulletSize = stats.bulletSize;
             room.players[socket.id].damage = stats.damage;
+            room.players[socket.id].mana = stats.mana !== undefined ? stats.mana : 0;
+            room.players[socket.id].maxMana = stats.maxMana !== undefined ? stats.maxMana : 0;
+            room.players[socket.id].manaCost = stats.manaCost !== undefined ? stats.manaCost : 0;
+            room.players[socket.id].ammo = stats.ammo !== undefined ? stats.ammo : 0;
+            room.players[socket.id].maxAmmo = stats.maxAmmo !== undefined ? stats.maxAmmo : 0;
+            room.players[socket.id].reloading = false;
         }
 
         io.to(socket.roomCode).emit('lobbyUpdate', room.players);
@@ -104,7 +110,7 @@ io.on('connection', (socket) => {
 
         room.gameStarted = true;
         room.waveActive = true;
-        room.zombiesToSpawn = 15 + (room.wave * 10); // Much bigger waves
+        room.zombiesToSpawn = 15 + (room.wave * 10);
 
         io.to(socket.roomCode).emit('gameStarted');
     });
@@ -128,7 +134,16 @@ io.on('connection', (socket) => {
         const room = rooms[socket.roomCode];
         if (!room || !room.gameStarted) return;
         let p = room.players[socket.id];
-        if (!p || p.hp <= 0) return;
+        if (!p || p.hp <= 0 || p.reloading) return;
+
+        // Class-specific ammo / mana checks
+        if (p.class === 'marksman') {
+            if (p.ammo <= 0) return;
+            p.ammo--;
+        } else if (p.class === 'mage') {
+            if (p.mana < p.manaCost) return;
+            p.mana -= p.manaCost;
+        }
 
         const angle = Math.atan2(target.y - (p.y + p.size/2), target.x - (p.x + p.size/2));
         const lifespan = p.class === 'melee' ? 5 : 60; 
@@ -144,6 +159,21 @@ io.on('connection', (socket) => {
             owner: socket.id,
             life: lifespan 
         });
+    });
+
+    socket.on('reload', () => {
+        const room = rooms[socket.roomCode];
+        if (!room || !room.gameStarted) return;
+        let p = room.players[socket.id];
+        if (!p || p.class !== 'marksman' || p.reloading || p.ammo === p.maxAmmo) return;
+
+        p.reloading = true;
+        setTimeout(() => {
+            if (rooms[socket.roomCode] && rooms[socket.roomCode].players[socket.id]) {
+                rooms[socket.roomCode].players[socket.id].ammo = rooms[socket.roomCode].players[socket.id].maxAmmo;
+                rooms[socket.roomCode].players[socket.id].reloading = false;
+            }
+        }, 1200); // 1.2 second reload time
     });
 
     socket.on('buy', (item) => {
@@ -181,7 +211,14 @@ setInterval(() => {
         let room = rooms[code];
         if (!room.gameStarted) continue;
 
-        // Increased spawn rate from 0.02 to 0.08 (zombies spawn much faster)
+        // Mage Mana Regeneration over time
+        for (let id in room.players) {
+            let p = room.players[id];
+            if (p.class === 'mage' && p.mana < p.maxMana && p.hp > 0) {
+                p.mana = Math.min(p.maxMana, p.mana + 0.35);
+            }
+        }
+
         if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.08) {
             let zType = 'normal';
             let roll = Math.random(); 
@@ -195,7 +232,6 @@ setInterval(() => {
             let zHp = 30 + (room.wave * 10);
             let zSpeed = 1.2 + (room.wave * 0.1);
             let zSize = 35;
-            let zColor = '#e74c3c';
 
             if (zType === 'tank') {
                 zHp = zHp * 4;       
@@ -290,7 +326,6 @@ setInterval(() => {
                 type: 'health'
             });
 
-            // Faster round turnaround (5 seconds instead of 10)
             setTimeout(() => {
                 if (rooms[code] && rooms[code].gameStarted) {
                     rooms[code].wave++;
