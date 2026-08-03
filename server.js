@@ -13,11 +13,21 @@ const classData = {
     marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 25 }
 };
 
+// Reliable 4-character code generator
+function generatePartyCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
 io.on('connection', (socket) => {
     console.log('A player connected:', socket.id);
 
     socket.on('createParty', () => {
-        const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const code = generatePartyCode();
         rooms[code] = {
             players: {},
             bullets: [],
@@ -41,12 +51,15 @@ io.on('connection', (socket) => {
             ...stats 
         };
 
+        console.log(`Party created with code: ${code}`);
         socket.emit('partyCreated', code);
         io.to(code).emit('lobbyUpdate', rooms[code].players);
     });
 
     socket.on('joinParty', (code) => {
         const upperCode = code ? code.trim().toUpperCase() : '';
+        console.log(`Player attempting to join code: ${upperCode}`);
+        
         if (rooms[upperCode] && !rooms[upperCode].gameStarted) {
             socket.roomCode = upperCode;
             socket.join(upperCode);
