@@ -7,6 +7,10 @@ app.use(express.static('public'));
 
 const rooms = {};
 
+const ARENA_CENTER_X = 500;
+const ARENA_CENTER_Y = 500;
+const ARENA_RADIUS = 460;
+
 const classData = {
     mage: { color: '#9b59b6', speed: 5.5, maxHp: 120, bulletSpeed: 9, bulletSize: 18, damage: 110, mana: 120, maxMana: 120, manaCost: 12, weaponType: 'orb' },
     melee: { color: '#95a5a6', speed: 7, maxHp: 220, bulletSpeed: 18, bulletSize: 12, damage: 160, weaponType: 'dagger' },
@@ -43,12 +47,14 @@ io.on('connection', (socket) => {
 
         const stats = classData['marksman'];
         rooms[code].players[socket.id] = {
-            x: 400, y: 300,
+            x: ARENA_CENTER_X, y: ARENA_CENTER_Y,
             size: 35,
             hp: stats.maxHp,
             money: 0,
             class: 'marksman',
+            baseClass: 'marksman',
             weaponType: 'pistol',
+            hasForceField: false,
             ...stats 
         };
 
@@ -65,13 +71,15 @@ io.on('connection', (socket) => {
 
             const stats = classData['marksman'];
             rooms[upperCode].players[socket.id] = {
-                x: 400 + Math.random() * 50 - 25, 
-                y: 300 + Math.random() * 50 - 25,
+                x: ARENA_CENTER_X + (Math.random() * 40 - 20), 
+                y: ARENA_CENTER_Y + (Math.random() * 40 - 20),
                 size: 35,
                 hp: stats.maxHp,
                 money: 0,
                 class: 'marksman',
+                baseClass: 'marksman',
                 weaponType: 'pistol',
+                hasForceField: false,
                 ...stats 
             };
 
@@ -89,6 +97,7 @@ io.on('connection', (socket) => {
         const stats = classData[playerClass];
         if (room.players[socket.id]) {
             room.players[socket.id].class = playerClass;
+            room.players[socket.id].baseClass = playerClass;
             room.players[socket.id].color = stats.color;
             room.players[socket.id].speed = stats.speed;
             room.players[socket.id].maxHp = stats.maxHp;
@@ -102,6 +111,7 @@ io.on('connection', (socket) => {
             room.players[socket.id].ammo = stats.ammo !== undefined ? stats.ammo : 0;
             room.players[socket.id].maxAmmo = stats.maxAmmo !== undefined ? stats.maxAmmo : 0;
             room.players[socket.id].weaponType = stats.weaponType || 'pistol';
+            room.players[socket.id].hasForceField = false;
             room.players[socket.id].reloading = false;
         }
 
@@ -130,8 +140,14 @@ io.on('connection', (socket) => {
         if (input.left) p.x -= p.speed;
         if (input.right) p.x += p.speed;
 
-        p.x = Math.max(0, Math.min(800 - p.size, p.x));
-        p.y = Math.max(0, Math.min(600 - p.size, p.y));
+        // Circular boundary restriction
+        let distFromCenter = Math.hypot((p.x + p.size/2) - ARENA_CENTER_X, (p.y + p.size/2) - ARENA_CENTER_Y);
+        let maxDist = ARENA_RADIUS - (p.size / 2);
+        if (distFromCenter > maxDist) {
+            let angle = Math.atan2((p.y + p.size/2) - ARENA_CENTER_Y, (p.x + p.size/2) - ARENA_CENTER_X);
+            p.x = ARENA_CENTER_X + Math.cos(angle) * maxDist - p.size/2;
+            p.y = ARENA_CENTER_Y + Math.sin(angle) * maxDist - p.size/2;
+        }
     });
 
     socket.on('shoot', (target) => {
@@ -141,9 +157,9 @@ io.on('connection', (socket) => {
         if (!p || p.hp <= 0 || p.reloading) return;
 
         let reloadTime = 500;
-        if (p.class === 'marksman') {
+        if (p.class === 'marksman' && p.weaponType !== 'megaWeapon') {
             if (p.weaponType === 'shotgun') reloadTime = 900;
-            if (p.weaponType === 'minigun') reloadTime = 300;
+            if (p.weaponType === 'minigun') reloadTime = 200;
 
             if (p.ammo <= 0) {
                 p.reloading = true;
@@ -165,14 +181,29 @@ io.on('connection', (socket) => {
                     }
                 }, reloadTime);
             }
-        } else if (p.class === 'mage') {
+        } else if (p.class === 'mage' && p.weaponType !== 'megaWeapon') {
             if (p.mana < p.manaCost) return;
             p.mana -= p.manaCost;
         }
 
         const baseAngle = Math.atan2(target.y - (p.y + p.size/2), target.x - (p.x + p.size/2));
 
-        if (p.class === 'marksman' && p.weaponType === 'shotgun') {
+        if (p.weaponType === 'megaWeapon') {
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                room.bullets.push({
+                    x: p.x + p.size/2,
+                    y: p.y + p.size/2,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle),
+                    speed: p.bulletSpeed * 1.5,
+                    size: p.bulletSize * 2,
+                    damage: p.damage,
+                    owner: socket.id,
+                    life: 80
+                });
+            }
+        } else if (p.class === 'marksman' && p.weaponType === 'shotgun') {
             for (let i = -1; i <= 1; i++) {
                 const angle = baseAngle + (i * 0.15);
                 room.bullets.push({
@@ -254,8 +285,8 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (p && p.hp <= 0) {
             p.hp = p.maxHp;
-            p.x = 400;
-            p.y = 300;
+            p.x = ARENA_CENTER_X;
+            p.y = ARENA_CENTER_Y;
             if (p.class === 'marksman') p.ammo = p.maxAmmo;
             if (p.class === 'mage') p.mana = p.maxMana;
             p.reloading = false;
@@ -268,57 +299,66 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
+        let base = classData[p.baseClass];
+
         if (item === 'health' && p.money >= 50) {
             p.money -= 50;
             p.hp = p.maxHp;
         } else if (item === 'maxHealth' && p.money >= 120) {
             p.money -= 120;
-            p.maxHp += 30;
+            p.maxHp += Math.round(base.maxHp * 0.10); // +10% of base
             p.hp = p.maxHp;
         } else if (item === 'damage' && p.money >= 100) {
             p.money -= 100;
-            p.damage += 15;
+            p.damage += Math.max(1, Math.round(base.damage * 0.01)); // +1% of base
         } else if (item === 'speed' && p.money >= 75) {
             p.money -= 75;
-            p.speed += 1;
+            p.speed += Number((base.speed * 0.01).toFixed(2)); // +1% of base
         } 
-        else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun') {
+        else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun' && p.weaponType !== 'megaWeapon') {
             p.money -= 150;
             p.weaponType = 'shotgun';
             p.maxAmmo = 8;
             p.ammo = 8;
             p.damage = 22;
-        } else if (item === 'minigun' && p.class === 'marksman' && p.money >= 250 && p.weaponType !== 'minigun') {
+        } else if (item === 'minigun' && p.class === 'marksman' && p.money >= 250 && p.weaponType !== 'minigun' && p.weaponType !== 'megaWeapon') {
             p.money -= 250;
             p.weaponType = 'minigun';
-            p.maxAmmo = 50;
-            p.ammo = 50;
+            p.maxAmmo = 200;
+            p.ammo = 200;
             p.damage = 15;
+            p.bulletSize = base.bulletSize * 3; // Tripled bullet size
         }
-        else if (item === 'fireStaff' && p.class === 'mage' && p.money >= 160 && p.weaponType !== 'fireStaff' && p.weaponType !== 'lightning') {
+        else if (item === 'fireStaff' && p.class === 'mage' && p.money >= 160 && p.weaponType !== 'fireStaff' && p.weaponType !== 'lightning' && p.weaponType !== 'megaWeapon') {
             p.money -= 160;
             p.weaponType = 'fireStaff';
             p.bulletSize = 26;
             p.damage = 180;
             p.manaCost = 22;
-        } else if (item === 'lightning' && p.class === 'mage' && p.money >= 260 && p.weaponType !== 'lightning') {
+        } else if (item === 'lightning' && p.class === 'mage' && p.money >= 260 && p.weaponType !== 'lightning' && p.weaponType !== 'megaWeapon') {
             p.money -= 260;
             p.weaponType = 'lightning';
             p.bulletSize = 10;
             p.damage = 140;
             p.manaCost = 18;
         }
-        else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana') {
+        else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana' && p.weaponType !== 'megaWeapon') {
             p.money -= 130;
             p.weaponType = 'fireAx';
             p.bulletSize = 16;
             p.damage = 240;
-        } else if (item === 'katana' && p.class === 'melee' && p.money >= 240 && p.weaponType !== 'katana') {
+        } else if (item === 'katana' && p.class === 'melee' && p.money >= 240 && p.weaponType !== 'katana' && p.weaponType !== 'megaWeapon') {
             p.money -= 240;
             p.weaponType = 'katana';
             p.bulletSize = 14;
             p.damage = 320;
-            p.speed += 1; 
+            p.speed += base.speed * 0.05; 
+        }
+        else if (item === 'megaWeapon' && p.money >= 100000 && p.weaponType !== 'megaWeapon') {
+            p.money -= 100000;
+            p.weaponType = 'megaWeapon';
+            p.damage *= 2.5;
+            p.hasForceField = true;
         }
     });
 
@@ -346,7 +386,8 @@ setInterval(() => {
             }
         }
 
-        if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.08) {
+        // Faster spawning rate
+        if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.25) {
             let zType = 'normal';
             let roll = Math.random(); 
             
@@ -364,9 +405,9 @@ setInterval(() => {
             let zSize = 35;
 
             if (zType === 'boss') {
-                zHp = 600 + (room.wave * 150);
-                zSpeed = 0.9 + (room.wave * 0.02);
-                zSize = 85;
+                zHp = 3500 + (room.wave * 800); // Powerful boss
+                zSpeed = 1.8 + (room.wave * 0.03);
+                zSize = 105;
             } else if (zType === 'tank') {
                 zHp = zHp * 5;       
                 zSpeed = zSpeed * 0.35; 
@@ -377,9 +418,14 @@ setInterval(() => {
                 zSize = 25;          
             }
 
+            // Spawn along outer circle boundary
+            let spawnAngle = Math.random() * Math.PI * 2;
+            let spawnX = ARENA_CENTER_X + Math.cos(spawnAngle) * ARENA_RADIUS;
+            let spawnY = ARENA_CENTER_Y + Math.sin(spawnAngle) * ARENA_RADIUS;
+
             room.zombies.push({
-                x: Math.random() < 0.5 ? -40 : 840,
-                y: Math.random() * 600,
+                x: spawnX,
+                y: spawnY,
                 size: zSize,
                 hp: zHp,
                 maxHp: zHp,
@@ -407,8 +453,16 @@ setInterval(() => {
                 z.x += Math.cos(angle) * z.speed;
                 z.y += Math.sin(angle) * z.speed;
 
-                let hitDistance = z.type === 'boss' ? 60 : 35;
-                if (minDist < hitDistance) closest.hp -= (z.type === 'boss' ? 3 : 1);
+                let hitDistance = z.type === 'boss' ? 70 : 35;
+                if (minDist < hitDistance) {
+                    if (closest.hasForceField) {
+                        z.hp -= 40; // Force field damage
+                        z.x -= Math.cos(angle) * 35;
+                        z.y -= Math.sin(angle) * 35;
+                    } else {
+                        closest.hp -= (z.type === 'boss' ? 6 : 1);
+                    }
+                }
             }
         });
 
@@ -417,7 +471,8 @@ setInterval(() => {
             b.y += b.dy * b.speed;
             b.life--;
 
-            if (b.life <= 0 || b.x < 0 || b.x > 800 || b.y < 0 || b.y > 600) {
+            let distFromCenter = Math.hypot(b.x - ARENA_CENTER_X, b.y - ARENA_CENTER_Y);
+            if (b.life <= 0 || distFromCenter > ARENA_RADIUS) {
                 b.markedForDeletion = true;
                 return;
             }
@@ -430,7 +485,7 @@ setInterval(() => {
                     if (z.hp <= 0 && !z.rewarded) {
                         z.rewarded = true;
                         if (b.owner && room.players[b.owner]) {
-                            room.players[b.owner].money += (z.type === 'boss' ? 300 : 20);
+                            room.players[b.owner].money += (z.type === 'boss' ? 500 : 20);
                         }
                     }
                 }
@@ -464,11 +519,12 @@ setInterval(() => {
             }
 
             room.pickups.push({
-                x: Math.random() * 700 + 50,
-                y: Math.random() * 500 + 50,
+                x: ARENA_CENTER_X + (Math.random() * 200 - 100),
+                y: ARENA_CENTER_Y + (Math.random() * 200 - 100),
                 type: 'health'
             });
 
+            // Shorter wave delay (2 seconds)
             setTimeout(() => {
                 if (rooms[code] && rooms[code].gameStarted) {
                     rooms[code].wave++;
@@ -476,7 +532,7 @@ setInterval(() => {
                     rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 18);
                     rooms[code].bossSpawnedThisWave = false;
                 }
-            }, 5000); 
+            }, 2000); 
         }
 
         io.to(code).emit('stateUpdate', {
