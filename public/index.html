@@ -82,10 +82,6 @@
             font-size: 14px;
             background: #7f8c8d;
         }
-        #in-game-menu-btn:hover {
-            background: #95a5a6;
-        }
-        /* Full Screen Shop Overlay */
         #shop {
             position: absolute;
             top: 0;
@@ -99,18 +95,36 @@
             justify-content: center;
             align-items: center;
         }
+        .shop-container {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+        }
         .shop-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            max-width: 900px;
-            margin-top: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-width: 600px;
         }
         .shop-grid button {
-            padding: 15px;
-            font-size: 14px;
+            padding: 12px;
+            font-size: 13px;
             width: 260px;
             margin: 0;
+        }
+        #tooltip-box {
+            width: 260px;
+            min-height: 120px;
+            background: #1e1e2f;
+            border: 2px solid #f1c40f;
+            border-radius: 8px;
+            padding: 15px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        #tooltip-box h4 {
+            margin: 0 0 8px 0;
+            color: #f1c40f;
         }
     </style>
 </head>
@@ -132,19 +146,38 @@
         <!-- Full-Screen Shop Overlay -->
         <div id="shop" class="hidden">
             <h2 style="color: #f1c40f; margin-bottom: 5px;">🛒 ARMORY & SHOP</h2>
-            <p style="font-size: 18px; margin-bottom: 15px;">Next wave starts in: <span id="shop-timer" style="color: #e74c3c; font-weight: bold;">30</span>s</p>
-            <div class="shop-grid">
-                <button onclick="buyItem('health')">Heal Full ($50)</button>
-                <button onclick="buyItem('maxHealth')">+10% Max HP ($120)</button>
-                <button onclick="buyItem('damage')">+1% Damage ($100)</button>
-                <button onclick="buyItem('speed')">+1% Speed ($75)</button>
-                <button onclick="buyItem('shotgun')" style="background: #e67e22;">Shotgun (Marksman) ($150)</button>
-                <button onclick="buyItem('minigun')" style="background: #c0392b;">Minigun (Marksman) ($250)</button>
-                <button onclick="buyItem('fireStaff')" style="background: #8e44ad;">Fire Staff (Mage) ($160)</button>
-                <button onclick="buyItem('lightning')" style="background: #2980b9;">Lightning (Mage) ($260)</button>
-                <button onclick="buyItem('fireAx')" style="background: #d35400;">Fire Axe (Melee) ($130)</button>
-                <button onclick="buyItem('katana')" style="background: #16a085;">Laser Katana (Melee) ($240)</button>
-                <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold; grid-column: span 2;">⚡ Mega Weapon ($100,000)</button>
+            <p style="font-size: 16px; margin-bottom: 5px;">Next wave starts in: <span id="shop-timer" style="color: #e74c3c; font-weight: bold;">30</span>s</p>
+            <button onclick="startWaveEarly()" style="background: #2980b9; padding: 8px 18px; font-size: 14px; margin-bottom: 12px;">⚡ Start Wave Early</button>
+            
+            <div class="shop-container">
+                <div class="shop-grid">
+                    <button onclick="buyItem('health')" onmouseover="showTip('Health Pack', 'Restores your HP back to maximum.', 'Instant', '50')" onmouseleave="clearTip()">Heal Full ($50)</button>
+                    <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases your total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP ($120)</button>
+                    <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently increases damage dealt by all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage ($100)</button>
+                    <button onclick="buyItem('speed')" onmouseover="showTip('Running Shoes', 'Increases your overall movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed ($75)</button>
+                    
+                    <button onclick="buyItem('shotgun')" style="background: #e67e22;" onmouseover="showTip('Shotgun', 'Fires a wide spread of 3 bullets per shot.', '22 Damage | Slow (0.9s)', '150')" onmouseleave="clearTip()">Shotgun (Marksman) ($150)</button>
+                    <button onclick="buyItem('minigun')" style="background: #c0392b;" onmouseover="showTip('Minigun', 'Rapidly fires heavy continuous rounds with large magazines.', '15 Damage | Very Fast (0.2s)', '250')" onmouseleave="clearTip()">Minigun (Marksman) ($250)</button>
+                    
+                    <button onclick="buyItem('fireStaff')" style="background: #8e44ad;" onmouseover="showTip('Fire Staff', 'Launches large explosive fire orbs that pierce through crowds.', '180 Damage | Slow (1.2s)', '160')" onmouseleave="clearTip()">Fire Staff (Mage) ($160)</button>
+                    <button onclick="buyItem('lightning')" style="background: #2980b9;" onmouseover="showTip('Lightning Rod', 'Fires rapid electric arcs with pinpoint precision.', '140 Damage | Medium (0.8s)', '260')" onmouseleave="clearTip()">Lightning (Mage) ($260)</button>
+                    
+                    <button onclick="buyItem('fireAx')" style="background: #d35400;" onmouseover="showTip('Fire Axe', 'Heavy close-range melee swing dealing devastating impact.', '240 Damage | Medium (0.6s)', '130')" onmouseleave="clearTip()">Fire Axe (Melee) ($130)</button>
+                    <button onclick="buyItem('katana')" style="background: #16a085;" onmouseover="showTip('Laser Katana', 'Lightning-fast blade slice paired with a mobility boost.', '320 Damage | Fast (0.3s)', '240')" onmouseleave="clearTip()">Laser Katana (Melee) ($240)</button>
+                    
+                    <button onclick="buyItem('mage')" style="background: #9b59b6;" onmouseover="showTip('Switch to Mage', 'Change class to Mage (uses mana and spell weapons).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Mage ($10,000)</button>
+                    <button onclick="buyItem('melee')" style="background: #95a5a6;" onmouseover="showTip('Switch to Melee', 'Change class to Melee bruiser (high HP & close quarters).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Melee ($10,000)</button>
+                    
+                    <button onclick="buyItem('marksman')" style="background: #f1c40f; color:#000;" onmouseover="showTip('Switch to Marksman', 'Change class to Marksman (ammo reload mechanics & guns).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Marksman ($10,000)</button>
+                    <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold;" onmouseover="showTip('MEGA WEAPON', 'Supreme devastation weapon with multi-directional blasts and built-in protective forcefield.', '2.5x Multiplier | Rapid Spread', '100,000')" onmouseleave="clearTip()">⚡ Mega Weapon ($100,000)</button>
+                </div>
+
+                <!-- Hover Stat Tooltip Box -->
+                <div id="tooltip-box">
+                    <h4>Armory Intel</h4>
+                    <p id="tip-desc" style="color: #ccc; margin: 0 0 10px 0;">Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.</p>
+                    <div id="tip-stats" style="font-size: 13px; color: #f1c40f;"></div>
+                </div>
             </div>
         </div>
 
@@ -217,15 +250,27 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], wave: 1, waveActive: false, shopTimer: 30 };
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], wave: 1, waveActive: false, shopTimer: 30 };
 
         function createParty() { socket.emit('createParty'); }
         function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
         function selectClass(cls) { socket.emit('selectClass', cls); }
         function startGame() { socket.emit('startGame'); }
+        function startWaveEarly() { socket.emit('startWaveEarly'); }
         function respawnPlayer() { socket.emit('respawn'); }
         function buyItem(item) { socket.emit('buy', item); }
         function goToMainMenu() { location.reload(); }
+
+        function showTip(title, desc, stats, cost) {
+            document.querySelector('#tooltip-box h4').innerText = title;
+            document.getElementById('tip-desc').innerText = desc;
+            document.getElementById('tip-stats').innerHTML = `<b>Specs:</b> ${stats}<br><b>Cost:</b> $${cost}`;
+        }
+        function clearTip() {
+            document.querySelector('#tooltip-box h4').innerText = "Armory Intel";
+            document.getElementById('tip-desc').innerText = "Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.";
+            document.getElementById('tip-stats').innerHTML = "";
+        }
 
         socket.on('partyCreated', (code) => {
             mainMenu.classList.add('hidden');
@@ -379,6 +424,17 @@
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText('🛢️', barrel.x + barrel.size/2, barrel.y + barrel.size/2);
+                    });
+                }
+
+                // Render Barrel Explosions
+                if (gameState.explosions) {
+                    gameState.explosions.forEach(ex => {
+                        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
+                        ctx.lineWidth = 6;
+                        ctx.beginPath();
+                        ctx.arc(ex.x, ex.y, ex.radius * (1 - (ex.life / 15)), 0, Math.PI * 2);
+                        ctx.stroke();
                     });
                 }
 
