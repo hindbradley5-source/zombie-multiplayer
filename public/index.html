@@ -140,7 +140,7 @@
             <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold;">⚡ Mega Weapon ($100,000)</button>
         </div>
 
-        <!-- Canvas (1000x1000 resolution rendered inside circle viewport) -->
+        <!-- Canvas -->
         <canvas id="gameCanvas" width="1000" height="1000"></canvas>
 
         <!-- Main Menu Screen -->
@@ -202,7 +202,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], wave: 1, waveActive: false };
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], wave: 1, waveActive: false };
 
         function createParty() { socket.emit('createParty'); }
         function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
@@ -261,12 +261,16 @@
                 }
 
                 let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
+                let statusText = ``;
+                if (me.dashCooldown > 0) statusText += ` | Dash CD: ${me.dashCooldown}`;
+                if (me.powerUpType) statusText += ` | [⚡ ${me.powerUpType.toUpperCase()}]`;
+
                 if (me.class === 'marksman' && me.weaponType !== 'megaWeapon') {
-                    extraStat.innerText = me.reloading ? `| [${weaponName}] Auto-Reloading...` : `| [${weaponName}] Ammo: ${me.ammo}/${me.maxAmmo}`;
+                    extraStat.innerText = me.reloading ? `| [${weaponName}] Auto-Reloading...` : `| [${weaponName}] Ammo: ${me.ammo}/${me.maxAmmo} ${statusText}`;
                 } else if (me.class === 'mage' && me.weaponType !== 'megaWeapon') {
-                    extraStat.innerText = `| [${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
+                    extraStat.innerText = `| [${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana} ${statusText}`;
                 } else {
-                    extraStat.innerText = `| [${weaponName}]`;
+                    extraStat.innerText = `| [${weaponName}] ${statusText}`;
                 }
             }
 
@@ -278,7 +282,21 @@
         });
 
         const keys = {};
-        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keydown', (e) => { 
+            keys[e.key.toLowerCase()] = true; 
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (lobbyScreen.classList.contains('hidden')) {
+                    socket.emit('move', {
+                        up: keys['w'] || keys['arrowup'],
+                        down: keys['s'] || keys['arrowdown'],
+                        left: keys['a'] || keys['arrowleft'],
+                        right: keys['d'] || keys['arrowright'],
+                        dash: true
+                    });
+                }
+            }
+        });
         window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
         setInterval(() => {
@@ -287,14 +305,14 @@
                 up: keys['w'] || keys['arrowup'],
                 down: keys['s'] || keys['arrowdown'],
                 left: keys['a'] || keys['arrowleft'],
-                right: keys['d'] || keys['arrowright']
+                right: keys['d'] || keys['arrowright'],
+                dash: false
             });
         }, 1000 / 30);
 
         canvas.addEventListener('click', (e) => {
             if (!lobbyScreen.classList.contains('hidden')) return;
             const rect = canvas.getBoundingClientRect();
-            // Scale click coordinates from DOM element size to canvas internal 1000x1000 resolution
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             socket.emit('shoot', { 
@@ -307,7 +325,11 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (lobbyScreen.classList.contains('hidden')) {
-                // Draw arena floor grid lines inside circle
+                // Dynamic ambient background color based on wave
+                let tintAlpha = Math.min(0.4, (gameState.wave % 5) * 0.08);
+                ctx.fillStyle = `rgba(10, 0, 20, ${tintAlpha})`;
+                ctx.fillRect(0, 0, 1000, 1000);
+
                 ctx.strokeStyle = '#252525';
                 ctx.lineWidth = 2;
                 for (let i = 0; i <= 1000; i += 100) {
@@ -319,11 +341,25 @@
                     ctx.stroke();
                 }
 
+                // Draw barrels
+                if (gameState.barrels) {
+                    gameState.barrels.forEach(barrel => {
+                        ctx.font = '26px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('🛢️', barrel.x + barrel.size/2, barrel.y + barrel.size/2);
+                    });
+                }
+
+                // Draw pickups & powerups
                 gameState.pickups.forEach(p => {
-                    ctx.font = '28px Arial';
+                    ctx.font = '26px Arial';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('❤️', p.x, p.y);
+                    let icon = '❤️';
+                    if (p.type === 'speed') icon = '⚡';
+                    if (p.type === 'doubleDamage') icon = '⭐';
+                    ctx.fillText(icon, p.x, p.y);
                 });
 
                 ctx.fillStyle = '#f39c12';
