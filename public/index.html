@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Online Zombie Game</title>
+    <style>
+        body { background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; font-family: Arial; }
+        canvas { background: #2c3e50; border: 3px solid #7f8c8d; cursor: crosshair; }
+        #menu { background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 10px; }
+        
+        /* Shop Menu Styling */
+        #shop-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 3px solid #f1c40f;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; }
+        .mage { background: #9b59b6; color: white; }
+        .melee { background: #95a5a6; color: black; }
+        .marksman { background: #f1c40f; color: black; }
+        .shop-btn { background: #2ecc71; color: white; display: block; width: 100%; }
+        .shop-btn:hover { background: #27ae60; }
+        
+        #hud { display: flex; gap: 30px; font-size: 18px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="menu">
+        <h2>Choose Your Class</h2>
+        <button class="mage" onclick="join('mage')">Mage (Big Fireballs)</button>
+        <button class="melee" onclick="join('melee')">Melee (High Damage, Short Range)</button>
+        <button class="marksman" onclick="join('marksman')">Marksman (Fast Shooter)</button>
+    </div>
+
+    <!-- HUD Information -->
+    <div id="hud" style="display: none;">
+        <h3 id="wave-display">Wave: 1</h3>
+        <h3 id="money-display">Money: $0</h3>
+    </div>
+
+    <!-- Upgrade Shop Overlay -->
+    <div id="shop-menu">
+        <h2>WAVE CLEARED! SHOP OPEN</h2>
+        <p>Your Money: $<span id="shop-money">0</span></p>
+        <button class="shop-btn" onclick="buy('health')">Buy Full Heal ($50)</button>
+        <button class="shop-btn" onclick="buy('damage')">Upgrade Damage ($100)</button>
+        <button class="shop-btn" onclick="buy('speed')">Upgrade Speed ($75)</button>
+        <p style="color: #f1c40f; font-size: 14px; margin-top: 15px;">Next wave starts automatically soon...</p>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600" style="display: none;"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const menu = document.getElementById('menu');
+        const hud = document.getElementById('hud');
+        const waveDisp = document.getElementById('wave-display');
+        const moneyDisp = document.getElementById('money-display');
+        const shopMenu = document.getElementById('shop-menu');
+        const shopMoney = document.getElementById('shop-money');
+
+        const keys = { up: false, down: false, left: false, right: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyW') keys.up = true;
+            if (e.code === 'KeyS') keys.down = true;
+            if (e.code === 'KeyA') keys.left = true;
+            if (e.code === 'KeyD') keys.right = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyW') keys.up = false;
+            if (e.code === 'KeyS') keys.down = false;
+            if (e.code === 'KeyA') keys.left = false;
+            if (e.code === 'KeyD') keys.right = false;
+        });
+
+        setInterval(() => {
+            if (canvas.style.display !== 'none') {
+                socket.emit('move', keys);
+            }
+        }, 1000/60);
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            socket.emit('shoot', { x: mouseX, y: mouseY });
+        });
+
+        function join(playerClass) {
+            socket.emit('joinGame', playerClass);
+            menu.style.display = 'none';
+            hud.style.display = 'flex';
+            canvas.style.display = 'block';
+        }
+
+        function buy(item) {
+            socket.emit('buy', item);
+        }
+
+        socket.on('stateUpdate', (state) => {
+            waveDisp.innerText = `Wave: ${state.wave}`;
+
+            // Check local player stats
+            let myPlayer = state.players[socket.id];
+            if (myPlayer) {
+                moneyDisp.innerText = `Money: $${myPlayer.money}`;
+                shopMoney.innerText = myPlayer.money;
+            }
+
+            // Show or hide the shop menu depending on whether a wave is active
+            if (!state.waveActive) {
+                shopMenu.style.display = 'block';
+            } else {
+                shopMenu.style.display = 'none';
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Health Pickups
+            state.pickups.forEach(p => {
+                ctx.fillStyle = '#2ecc71'; 
+                ctx.fillRect(p.x, p.y, 20, 20);
+                ctx.fillStyle = 'white';
+                ctx.fillText("+", p.x + 6, p.y + 14);
+            });
+
+            // Draw Players
+            for (let id in state.players) {
+                let p = state.players[id];
+                if (p.hp <= 0) continue;
+
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                
+                ctx.fillStyle = 'red';
+                ctx.fillRect(p.x, p.y - 10, p.size, 5);
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 5);
+            }
+
+            // Draw Zombies
+            state.zombies.forEach(z => {
+                ctx.fillStyle = z.color;
+                ctx.fillRect(z.x, z.y, z.size, z.size);
+            });
+
+            // Draw Bullets
+            state.bullets.forEach(b => {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        });
+    </script>
+</body>
+</html>
