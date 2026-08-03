@@ -197,15 +197,9 @@
         socket.on('stateUpdate', (state) => { gameState = state; });
 
         const keys = {};
-        window.addEventListener('keydown', (e) => {
-            keys[e.key.toLowerCase()] = true;
-            if (e.key.toLowerCase() === 'r') {
-                socket.emit('reload');
-            }
-        });
+        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
         window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
-        // Streamlined input ticker to avoid lag
         setInterval(() => {
             if (!lobbyScreen.classList.contains('hidden')) return;
             socket.emit('move', {
@@ -260,7 +254,6 @@
                     ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
                 }
 
-                // HUD DOM updates
                 document.getElementById('wave-display').innerText = gameState.wave;
                 let me = gameState.players[socket.id];
                 if (me) {
@@ -268,7 +261,7 @@
                     document.getElementById('hp-display').innerText = Math.max(0, me.hp);
 
                     if (me.class === 'marksman') {
-                        extraStat.innerText = me.reloading ? '| Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo} (Press R)`;
+                        extraStat.innerText = me.reloading ? '| Auto-Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo}`;
                     } else if (me.class === 'mage') {
                         extraStat.innerText = `| Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
                     } else {
