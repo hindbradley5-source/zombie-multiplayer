@@ -137,6 +137,13 @@
             <br>
             <button id="start-game-btn" onclick="startGame()" class="hidden" style="background: #e67e22;">Start Game</button>
         </div>
+
+        <!-- Death Screen -->
+        <div id="death-screen" class="screen hidden">
+            <h2 style="color: #e74c3c; font-size: 36px; margin-bottom: 5px;">YOU DIED</h2>
+            <p style="color: #bbb; margin-bottom: 20px;">The zombies overwhelmed you.</p>
+            <button onclick="respawnPlayer()" style="background: #e67e22; font-size: 18px;">Respawn</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -145,6 +152,7 @@
 
         const mainMenu = document.getElementById('main-menu');
         const lobbyScreen = document.getElementById('lobby-screen');
+        const deathScreen = document.getElementById('death-screen');
         const hud = document.getElementById('hud');
         const shop = document.getElementById('shop');
         const partyCodeDisplay = document.getElementById('party-code-display');
@@ -162,6 +170,7 @@
         function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
         function selectClass(cls) { socket.emit('selectClass', cls); }
         function startGame() { socket.emit('startGame'); }
+        function respawnPlayer() { socket.emit('respawn'); }
         function buyItem(item) { socket.emit('buy', item); }
 
         socket.on('partyCreated', (code) => {
@@ -243,15 +252,17 @@
 
                 for (let id in gameState.players) {
                     let p = gameState.players[id];
-                    ctx.font = `${p.size * 1.2}px Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('🤠', p.x + p.size / 2, p.y + p.size / 2);
+                    if (p.hp > 0) {
+                        ctx.font = `${p.size * 1.2}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('🤠', p.x + p.size / 2, p.y + p.size / 2);
 
-                    ctx.fillStyle = '#ff0000';
-                    ctx.fillRect(p.x, p.y - 10, p.size, 4);
-                    ctx.fillStyle = '#00ff00';
-                    ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fillRect(p.x, p.y - 10, p.size, 4);
+                        ctx.fillStyle = '#00ff00';
+                        ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
+                    }
                 }
 
                 document.getElementById('wave-display').innerText = gameState.wave;
@@ -259,6 +270,12 @@
                 if (me) {
                     document.getElementById('money-display').innerText = me.money;
                     document.getElementById('hp-display').innerText = Math.max(0, me.hp);
+
+                    if (me.hp <= 0) {
+                        deathScreen.classList.remove('hidden');
+                    } else {
+                        deathScreen.classList.add('hidden');
+                    }
 
                     if (me.class === 'marksman') {
                         extraStat.innerText = me.reloading ? '| Auto-Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo}`;
