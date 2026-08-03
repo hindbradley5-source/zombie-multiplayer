@@ -155,13 +155,6 @@
         let gameState = { players: {}, bullets: [], zombies: [], pickups: [], wave: 1, waveActive: false };
         let myId = null;
 
-        // Sprites
-        const playerSprite = new Image();
-        playerSprite.src = 'https://cdn-icons-png.flaticon.com/512/3094/3094901.png';
-
-        const zombieSprite = new Image();
-        zombieSprite.src = 'https://cdn-icons-png.flaticon.com/512/2904/2904859.png';
-
         function createParty() {
             socket.emit('createParty');
         }
@@ -225,6 +218,7 @@
         window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
+        // Optimized input loop (runs smoothly at 30 updates/sec to eliminate network lag)
         setInterval(() => {
             if (!lobbyScreen.classList.contains('hidden')) return;
             let input = {
@@ -234,7 +228,7 @@
                 right: keys['d'] || keys['arrowright']
             };
             socket.emit('move', input);
-        }, 1000 / 60);
+        }, 1000 / 30);
 
         canvas.addEventListener('click', (e) => {
             if (!lobbyScreen.classList.contains('hidden')) return;
@@ -250,13 +244,15 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (lobbyScreen.classList.contains('hidden')) {
+                // Draw Health Pickups (Medkits)
                 gameState.pickups.forEach(p => {
-                    ctx.fillStyle = '#2ecc71';
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.font = '24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('❤️', p.x, p.y);
                 });
 
+                // Draw Bullets
                 ctx.fillStyle = '#f39c12';
                 gameState.bullets.forEach(b => {
                     ctx.beginPath();
@@ -264,30 +260,30 @@
                     ctx.fill();
                 });
 
+                // Draw Zombies using clean Emojis 🧟
                 gameState.zombies.forEach(z => {
-                    if (zombieSprite.complete && zombieSprite.naturalHeight !== 0) {
-                        ctx.drawImage(zombieSprite, z.x, z.y, z.size, z.size);
-                    } else {
-                        ctx.fillStyle = z.type === 'tank' ? '#27ae60' : (z.type === 'runner' ? '#e67e22' : '#e74c3c');
-                        ctx.fillRect(z.x, z.y, z.size, z.size);
-                    }
+                    ctx.font = `${z.size * 1.2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🧟', z.x + z.size / 2, z.y + z.size / 2);
                 });
 
+                // Draw Players using clean Emojis 🤠
                 for (let id in gameState.players) {
                     let p = gameState.players[id];
-                    if (playerSprite.complete && playerSprite.naturalHeight !== 0) {
-                        ctx.drawImage(playerSprite, p.x, p.y, p.size, p.size);
-                    } else {
-                        ctx.fillStyle = p.color;
-                        ctx.fillRect(p.x, p.y, p.size, p.size);
-                    }
+                    ctx.font = `${p.size * 1.2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🤠', p.x + p.size / 2, p.y + p.size / 2);
 
+                    // Health Bar above player
                     ctx.fillStyle = '#ff0000';
-                    ctx.fillRect(p.x, p.y - 8, p.size, 4);
+                    ctx.fillRect(p.x, p.y - 10, p.size, 4);
                     ctx.fillStyle = '#00ff00';
-                    ctx.fillRect(p.x, p.y - 8, p.size * (p.hp / p.maxHp), 4);
+                    ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
                 }
 
+                // Update HUD texts
                 document.getElementById('wave-display').innerText = gameState.wave;
                 if (gameState.players[socket.id]) {
                     document.getElementById('money-display').innerText = gameState.players[socket.id].money;
