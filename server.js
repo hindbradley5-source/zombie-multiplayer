@@ -136,10 +136,28 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (!p || p.hp <= 0 || p.reloading) return;
 
-        // Class-specific ammo / mana checks
         if (p.class === 'marksman') {
-            if (p.ammo <= 0) return;
+            if (p.ammo <= 0) {
+                // Auto-trigger reload if empty
+                p.reloading = true;
+                setTimeout(() => {
+                    if (room.players[socket.id]) {
+                        room.players[socket.id].ammo = room.players[socket.id].maxAmmo;
+                        room.players[socket.id].reloading = false;
+                    }
+                }, 500);
+                return;
+            }
             p.ammo--;
+            if (p.ammo === 0) {
+                p.reloading = true;
+                setTimeout(() => {
+                    if (room.players[socket.id]) {
+                        room.players[socket.id].ammo = room.players[socket.id].maxAmmo;
+                        room.players[socket.id].reloading = false;
+                    }
+                }, 500);
+            }
         } else if (p.class === 'mage') {
             if (p.mana < p.manaCost) return;
             p.mana -= p.manaCost;
@@ -159,21 +177,6 @@ io.on('connection', (socket) => {
             owner: socket.id,
             life: lifespan 
         });
-    });
-
-    socket.on('reload', () => {
-        const room = rooms[socket.roomCode];
-        if (!room || !room.gameStarted) return;
-        let p = room.players[socket.id];
-        if (!p || p.class !== 'marksman' || p.reloading || p.ammo === p.maxAmmo) return;
-
-        p.reloading = true;
-        setTimeout(() => {
-            if (rooms[socket.roomCode] && rooms[socket.roomCode].players[socket.id]) {
-                rooms[socket.roomCode].players[socket.id].ammo = rooms[socket.roomCode].players[socket.id].maxAmmo;
-                rooms[socket.roomCode].players[socket.id].reloading = false;
-            }
-        }, 1200); // 1.2 second reload time
     });
 
     socket.on('buy', (item) => {
@@ -211,7 +214,6 @@ setInterval(() => {
         let room = rooms[code];
         if (!room.gameStarted) continue;
 
-        // Mage Mana Regeneration over time
         for (let id in room.players) {
             let p = room.players[id];
             if (p.class === 'mage' && p.mana < p.maxMana && p.hp > 0) {
