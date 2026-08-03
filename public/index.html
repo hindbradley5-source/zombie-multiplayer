@@ -36,7 +36,637 @@
             align-items: center;
             z-index: 10;
         }
+        .hidden {<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Zombie Multiplayer Survival</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0b0b14;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            background-color: #12121c;
+        }
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #1b1b2f 0%, #080811 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
         .hidden {
+            display: none !important;
+        }
+        input, button {
+            padding: 12px 24px;
+            margin: 8px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            text-align: center;
+            outline: none;
+        }
+        input:focus {
+            border-color: #f1c40f;
+            box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
+        }
+        button {
+            background: linear-gradient(135deg, #27ae60, #219653);
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+        }
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            z-index: 5;
+            pointer-events: none;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px #000;
+        }
+        #top-right-controls {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            z-index: 5;
+            display: flex;
+            gap: 10px;
+        }
+        #in-game-menu-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+            box-shadow: none;
+        }
+        #shop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 5, 10, 0.92);
+            z-index: 8;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .shop-container {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+        }
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-width: 600px;
+        }
+        .shop-grid button {
+            padding: 12px;
+            font-size: 13px;
+            width: 260px;
+            margin: 0;
+        }
+        #tooltip-box {
+            width: 260px;
+            min-height: 120px;
+            background: #1e1e2f;
+            border: 2px solid #f1c40f;
+            border-radius: 8px;
+            padding: 15px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        #tooltip-box h4 {
+            margin: 0 0 8px 0;
+            color: #f1c40f;
+        }
+        /* Fancy Menu Styles */
+        .menu-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+        .menu-title {
+            font-size: 38px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #f1c40f, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .menu-subtitle {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .avatar-grid {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0 25px 0;
+        }
+        .avatar-btn {
+            font-size: 28px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 8px;
+            cursor: pointer;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .avatar-btn.selected {
+            border-color: #f1c40f;
+            background: rgba(241, 196, 15, 0.15);
+            box-shadow: 0 0 10px rgba(241,196,15,0.4);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- HUD Top Left -->
+        <div id="hud" class="hidden">
+            Wave: <span id="wave-display">1</span> | 
+            Map: <span id="map-display" style="color: #3498db;">Apocalypse City</span> | 
+            Money: $<span id="money-display">0</span> | 
+            HP: <span id="hp-display">100</span> 
+            <span id="extra-stat" style="color: #f1c40f; margin-left: 10px;"></span>
+        </div>
+
+        <!-- Top Right Controls -->
+        <div id="top-right-controls">
+            <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
+        </div>
+
+        <!-- Full-Screen Shop Overlay -->
+        <div id="shop" class="hidden">
+            <h2 style="color: #f1c40f; margin-bottom: 5px;">🛒 ARMORY & SHOP</h2>
+            <p style="font-size: 16px; margin-bottom: 5px;">Next wave starts in: <span id="shop-timer" style="color: #e74c3c; font-weight: bold;">30</span>s</p>
+            <button onclick="startWaveEarly()" style="background: #2980b9; padding: 8px 18px; font-size: 14px; margin-bottom: 12px;">⚡ Start Wave Early</button>
+            
+            <div class="shop-container">
+                <div class="shop-grid">
+                    <button onclick="buyItem('health')" onmouseover="showTip('Health Pack', 'Restores your HP back to maximum.', 'Instant', '50')" onmouseleave="clearTip()">Heal Full ($50)</button>
+                    <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases your total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP ($120)</button>
+                    <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently increases damage dealt by all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage ($100)</button>
+                    <button onclick="buyItem('speed')" onmouseover="showTip('Running Shoes', 'Increases your overall movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed ($75)</button>
+                    
+                    <button onclick="buyItem('shotgun')" style="background: #e67e22;" onmouseover="showTip('Shotgun', 'Fires a wide spread of 3 bullets per shot.', '22 Damage | Slow (0.9s)', '150')" onmouseleave="clearTip()">Shotgun (Marksman) ($150)</button>
+                    <button onclick="buyItem('minigun')" style="background: #c0392b;" onmouseover="showTip('Minigun', 'Rapidly fires heavy continuous rounds with large magazines.', '15 Damage | Very Fast (0.2s)', '250')" onmouseleave="clearTip()">Minigun (Marksman) ($250)</button>
+                    
+                    <button onclick="buyItem('fireStaff')" style="background: #8e44ad;" onmouseover="showTip('Fire Staff', 'Launches large explosive fire orbs that pierce through crowds.', '180 Damage | Slow (1.2s)', '160')" onmouseleave="clearTip()">Fire Staff (Mage) ($160)</button>
+                    <button onclick="buyItem('lightning')" style="background: #2980b9;" onmouseover="showTip('Lightning Rod', 'Fires rapid electric arcs with pinpoint precision.', '140 Damage | Medium (0.8s)', '260')" onmouseleave="clearTip()">Lightning (Mage) ($260)</button>
+                    
+                    <button onclick="buyItem('fireAx')" style="background: #d35400;" onmouseover="showTip('Fire Axe', 'Heavy close-range melee swing dealing devastating impact.', '240 Damage | Medium (0.6s)', '130')" onmouseleave="clearTip()">Fire Axe (Melee) ($130)</button>
+                    <button onclick="buyItem('katana')" style="background: #16a085;" onmouseover="showTip('Laser Katana', 'Lightning-fast blade slice paired with a mobility boost.', '320 Damage | Fast (0.3s)', '240')" onmouseleave="clearTip()">Laser Katana (Melee) ($240)</button>
+                    
+                    <button onclick="buyItem('mage')" style="background: #9b59b6;" onmouseover="showTip('Switch to Mage', 'Change class to Mage (uses mana and spell weapons).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Mage ($10,000)</button>
+                    <button onclick="buyItem('melee')" style="background: #95a5a6;" onmouseover="showTip('Switch to Melee', 'Change class to Melee bruiser (high HP & close quarters).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Melee ($10,000)</button>
+                    
+                    <button onclick="buyItem('marksman')" style="background: #f1c40f; color:#000;" onmouseover="showTip('Switch to Marksman', 'Change class to Marksman (ammo reload mechanics & guns).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Marksman ($10,000)</button>
+                    <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold;" onmouseover="showTip('MEGA WEAPON', 'Supreme devastation weapon with multi-directional blasts and built-in protective forcefield.', '2.5x Multiplier | Rapid Spread', '100,000')" onmouseleave="clearTip()">⚡ Mega Weapon ($100,000)</button>
+                </div>
+
+                <!-- Hover Stat Tooltip Box -->
+                <div id="tooltip-box">
+                    <h4>Armory Intel</h4>
+                    <p id="tip-desc" style="color: #ccc; margin: 0 0 10px 0;">Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.</p>
+                    <div id="tip-stats" style="font-size: 13px; color: #f1c40f;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Main Menu Screen -->
+        <div id="main-menu" class="screen">
+            <div class="menu-card">
+                <div class="menu-title">Zombie Survival</div>
+                <div class="menu-subtitle">Multiplayer Arena Battle</div>
+                
+                <p style="font-size: 14px; color: #aaa; margin-bottom: 8px;">Select Your Emoji Avatar:</p>
+                <div class="avatar-grid" id="avatar-selection">
+                    <div class="avatar-btn selected" onclick="selectAvatar('🤠', this)">🤠</div>
+                    <div class="avatar-btn" onclick="selectAvatar('🤖', this)">🤖</div>
+                    <div class="avatar-btn" onclick="selectAvatar('🧙‍♂️', this)">🧙‍♂️</div>
+                    <div class="avatar-btn" onclick="selectAvatar('🥷', this)">🥷</div>
+                    <div class="avatar-btn" onclick="selectAvatar('👽', this)">👽</div>
+                </div>
+
+                <button onclick="createParty()" style="width: 100%; margin: 6px 0;">Create Party</button>
+                <div style="margin: 15px 0; color: #555; font-size: 13px;">— OR JOIN FRIEND —</div>
+                <input type="text" id="party-code-input" placeholder="Enter 4-Letter Code" maxlength="4" style="width: 80%; margin-bottom: 10px;">
+                <br>
+                <button onclick="joinParty()" style="width: 100%; margin: 6px 0; background: linear-gradient(135deg, #2980b9, #1f618d); box-shadow: 0 4px 15px rgba(41, 128, 185, 0.4);">Join Party</button>
+                <p id="error-msg" style="color: #e74c3c; margin-top: 10px; font-size: 14px;"></p>
+            </div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="screen hidden">
+            <div class="menu-card" style="max-width: 500px;">
+                <h2 id="party-code-display" style="margin-top: 0; color: #f1c40f;">Party Code: </h2>
+                <p style="color: #aaa; font-size: 14px;">Invite your teammate and choose your class below!</p>
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h4 style="margin: 0 0 10px 0; color: #ddd;">Players in Party:</h4>
+                    <ul id="player-list" style="list-style: none; padding: 0; margin: 0; font-size: 14px; color: #bbb;"></ul>
+                </div>
+                <h3 style="font-size: 16px; margin-bottom: 10px;">Choose Your Class:</h3>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button onclick="selectClass('mage')" style="background: #9b59b6; margin: 0; flex: 1;">Mage</button>
+                    <button onclick="selectClass('melee')" style="background: #95a5a6; margin: 0; flex: 1;">Melee</button>
+                    <button onclick="selectClass('marksman')" style="background: #f1c40f; color: #000; margin: 0; flex: 1;">Marksman</button>
+                </div>
+                <br>
+                <button id="start-game-btn" onclick="startGame()" class="hidden" style="width: 100%; background: linear-gradient(135deg, #e67e22, #d35400); margin-top: 10px;">Start Game</button>
+                <br>
+                <button onclick="goToMainMenu()" style="width: 100%; background: rgba(255,255,255,0.1); box-shadow: none; font-size: 14px; margin-top: 5px;">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- Death Screen -->
+        <div id="death-screen" class="screen hidden">
+            <h2 style="color: #e74c3c; font-size: 48px; margin-bottom: 5px; text-shadow: 0 0 20px rgba(231,76,60,0.5);">YOU DIED</h2>
+            <p style="color: #bbb; font-size: 20px; margin-bottom: 20px;">The horde overwhelmed your defenses.</p>
+            <button onclick="respawnPlayer()" style="background: linear-gradient(135deg, #e67e22, #d35400); font-size: 20px; box-shadow: 0 4px 20px rgba(230,126,34,0.6);">Respawn</button>
+            <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); box-shadow: none; font-size: 16px; margin-top: 15px;">Main Menu</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const mainMenu = document.getElementById('main-menu');
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const deathScreen = document.getElementById('death-screen');
+        const hud = document.getElementById('hud');
+        const shop = document.getElementById('shop');
+        const inGameMenuBtn = document.getElementById('in-game-menu-btn');
+        const partyCodeDisplay = document.getElementById('party-code-display');
+        const playerList = document.getElementById('player-list');
+        const errorMsg = document.getElementById('error-msg');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const extraStat = document.getElementById('extra-stat');
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], speechBubbles: [], wave: 1, waveActive: false, shopTimer: 30 };
+        let selectedAvatarSymbol = '🤠';
+
+        function createParty() { socket.emit('createParty'); }
+        function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
+        function selectClass(cls) { socket.emit('selectClass', cls); }
+        function selectAvatar(avatar, el) {
+            selectedAvatarSymbol = avatar;
+            document.querySelectorAll('.avatar-btn').forEach(btn => btn.classList.remove('selected'));
+            el.classList.add('selected');
+            socket.emit('selectAvatar', avatar);
+        }
+        function startGame() { socket.emit('startGame'); }
+        function startWaveEarly() { socket.emit('startWaveEarly'); }
+        function respawnPlayer() { socket.emit('respawn'); }
+        function buyItem(item) { socket.emit('buy', item); }
+        function goToMainMenu() { location.reload(); }
+
+        function showTip(title, desc, stats, cost) {
+            document.querySelector('#tooltip-box h4').innerText = title;
+            document.getElementById('tip-desc').innerText = desc;
+            document.getElementById('tip-stats').innerHTML = `<b>Specs:</b> ${stats}<br><b>Cost:</b> $${cost}`;
+        }
+        function clearTip() {
+            document.querySelector('#tooltip-box h4').innerText = "Armory Intel";
+            document.getElementById('tip-desc').innerText = "Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.";
+            document.getElementById('tip-stats').innerHTML = "";
+        }
+
+        socket.on('partyCreated', (code) => {
+            mainMenu.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            partyCodeDisplay.innerText = `Party Code: ${code}`;
+            startGameBtn.classList.remove('hidden');
+            socket.emit('selectAvatar', selectedAvatarSymbol);
+        });
+
+        socket.on('partyJoined', (code) => {
+            mainMenu.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            partyCodeDisplay.innerText = `Party Code: ${code}`;
+            socket.emit('selectAvatar', selectedAvatarSymbol);
+        });
+
+        socket.on('partyError', (msg) => { errorMsg.innerText = msg; });
+
+        socket.on('lobbyUpdate', (players) => {
+            playerList.innerHTML = '';
+            for (let id in players) {
+                let p = players[id];
+                let li = document.createElement('li');
+                li.style.padding = '4px 0';
+                li.innerText = `${p.avatar || '🤠'} Player (${id === socket.id ? 'You' : 'Friend'}) — Class: ${p.class.toUpperCase()}`;
+                playerList.appendChild(li);
+            }
+        });
+
+        socket.on('gameStarted', () => {
+            lobbyScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            inGameMenuBtn.classList.remove('hidden');
+        });
+
+        socket.on('stateUpdate', (state) => {
+            gameState = state;
+
+            document.getElementById('wave-display').innerText = gameState.wave;
+            document.getElementById('shop-timer').innerText = gameState.shopTimer;
+
+            // Map and Theme determination per 10 rounds
+            let mapIndex = Math.floor((gameState.wave - 1) / 10);
+            let mapNames = ["Apocalypse City", "Wild West Canyon", "Cyber Neon City", "Alien Wasteland"];
+            document.getElementById('map-display').innerText = mapNames[mapIndex % mapNames.length];
+
+            let me = gameState.players[socket.id];
+            if (me) {
+                document.getElementById('money-display').innerText = me.money;
+                document.getElementById('hp-display').innerText = `${Math.max(0, me.hp)}/${me.maxHp}`;
+
+                if (me.hp <= 0) {
+                    deathScreen.classList.remove('hidden');
+                    inGameMenuBtn.classList.add('hidden');
+                } else {
+                    deathScreen.classList.add('hidden');
+                    inGameMenuBtn.classList.remove('hidden');
+                }
+
+                let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
+                let statusText = ``;
+                if (me.dashCooldown > 0) statusText += ` | Dash CD: ${me.dashCooldown}`;
+                if (me.powerUpType) statusText += ` | [⚡ ${me.powerUpType.toUpperCase()}]`;
+
+                if (me.class === 'marksman' && me.weaponType !== 'megaWeapon') {
+                    extraStat.innerText = me.reloading ? `| [${weaponName}] Auto-Reloading...` : `| [${weaponName}] Ammo: ${me.ammo}/${me.maxAmmo} ${statusText}`;
+                } else if (me.class === 'mage' && me.weaponType !== 'megaWeapon') {
+                    extraStat.innerText = `| [${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana} ${statusText}`;
+                } else {
+                    extraStat.innerText = `| [${weaponName}] ${statusText}`;
+                }
+            }
+
+            if (!gameState.waveActive) {
+                shop.classList.remove('hidden');
+            } else {
+                shop.classList.add('hidden');
+            }
+        });
+
+        const keys = {};
+        window.addEventListener('keydown', (e) => { 
+            keys[e.key.toLowerCase()] = true; 
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (lobbyScreen.classList.contains('hidden')) {
+                    socket.emit('move', {
+                        up: keys['w'] || keys['arrowup'],
+                        down: keys['s'] || keys['arrowdown'],
+                        left: keys['a'] || keys['arrowleft'],
+                        right: keys['d'] || keys['arrowright'],
+                        dash: true
+                    });
+                }
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        setInterval(() => {
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            socket.emit('move', {
+                up: keys['w'] || keys['arrowup'],
+                down: keys['s'] || keys['arrowdown'],
+                left: keys['a'] || keys['arrowleft'],
+                right: keys['d'] || keys['arrowright'],
+                dash: false
+            });
+        }, 1000 / 30);
+
+        canvas.addEventListener('click', (e) => {
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            const me = gameState.players[socket.id];
+            if (!me) return;
+
+            const camX = me.x - canvas.width / 2;
+            const camY = me.y - canvas.height / 2;
+
+            socket.emit('shoot', { 
+                x: e.clientX + camX, 
+                y: e.clientY + camY 
+            });
+        });
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (lobbyScreen.classList.contains('hidden')) {
+                const me = gameState.players[socket.id];
+                const camX = me ? me.x - canvas.width / 2 : 0;
+                const camY = me ? me.y - canvas.height / 2 : 0;
+
+                ctx.save();
+                ctx.translate(-camX, -camY);
+
+                // Map Theme styling based on wave block
+                let mapIndex = Math.floor((gameState.wave - 1) / 10) % 4;
+                let bgColors = ['#12121c', '#2c1e14', '#0a192f', '#1b1220'];
+                let gridColors = ['#20202d', '#3d291b', '#102a43', '#281832'];
+                let borderColors = ['#f1c40f', '#d35400', '#00ffcc', '#ff00ff'];
+
+                ctx.fillStyle = bgColors[mapIndex];
+                ctx.fillRect(0, 0, 2000, 2000);
+
+                ctx.strokeStyle = gridColors[mapIndex];
+                ctx.lineWidth = 2;
+                for (let i = 0; i <= 2000; i += 100) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0); ctx.lineTo(i, 2000);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(0, i); ctx.lineTo(2000, i);
+                    ctx.stroke();
+                }
+
+                // Arena Boundary Circle
+                ctx.strokeStyle = borderColors[mapIndex];
+                ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.arc(1000, 1000, 950, 0, Math.PI * 2);
+                ctx.stroke();
+
+                if (gameState.barrels) {
+                    gameState.barrels.forEach(barrel => {
+                        ctx.font = '32px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('🛢️', barrel.x + barrel.size/2, barrel.y + barrel.size/2);
+                    });
+                }
+
+                if (gameState.explosions) {
+                    gameState.explosions.forEach(ex => {
+                        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
+                        ctx.lineWidth = 6;
+                        ctx.beginPath();
+                        ctx.arc(ex.x, ex.y, ex.radius * (1 - (ex.life / 15)), 0, Math.PI * 2);
+                        ctx.stroke();
+                    });
+                }
+
+                gameState.pickups.forEach(p => {
+                    ctx.font = '32px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    let icon = '❤️';
+                    if (p.type === 'speed') icon = '⚡';
+                    if (p.type === 'doubleDamage') icon = '⭐';
+                    ctx.fillText(icon, p.x, p.y);
+                });
+
+                ctx.fillStyle = '#f39c12';
+                gameState.bullets.forEach(b => {
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                gameState.zombies.forEach(z => {
+                    ctx.font = `${z.size * 1.2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Different enemies per map theme block
+                    let emoji = '🧟';
+                    if (z.type === 'boss') {
+                        emoji = mapIndex === 1 ? '🐂' : mapIndex === 2 ? '🤖' : mapIndex === 3 ? '👾' : '👹';
+                    } else {
+                        if (mapIndex === 1) emoji = '🤠'; // Desert cowboys/horses
+                        else if (mapIndex === 2) emoji = '🤖'; // Futuristic robots
+                        else if (mapIndex === 3) emoji = '👽'; // Alien monsters
+                    }
+
+                    ctx.fillText(emoji, z.x + z.size / 2, z.y + z.size / 2);
+
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(z.x, z.y - 12, z.size, 5);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(z.x, z.y - 12, z.size * Math.max(0, (z.hp / z.maxHp)), 5);
+                });
+
+                for (let id in gameState.players) {
+                    let p = gameState.players[id];
+                    if (p.hp > 0) {
+                        if (p.hasForceField) {
+                            ctx.strokeStyle = '#3498db';
+                            ctx.lineWidth = 4;
+                            ctx.beginPath();
+                            ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size * 1.5, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+
+                        ctx.font = `${p.size * 1.2}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(p.avatar || '🤠', p.x + p.size / 2, p.y + p.size / 2);
+
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fillRect(p.x, p.y - 15, p.size, 5);
+                        ctx.fillStyle = '#00ff00';
+                        ctx.fillRect(p.x, p.y - 15, p.size * Math.max(0, (p.hp / p.maxHp)), 5);
+                    }
+                }
+
+                // Render funny death speech bubbles
+                if (gameState.speechBubbles) {
+                    gameState.speechBubbles.forEach(sb => {
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        let metrics = ctx.measureText(sb.text);
+                        let padding = 8;
+
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                        ctx.fillRect(sb.x - metrics.width/2 - padding, sb.y - 25 - padding, metrics.width + padding*2, 28 + padding);
+                        ctx.strokeStyle = '#f1c40f';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(sb.x - metrics.width/2 - padding, sb.y - 25 - padding, metrics.width + padding*2, 28 + padding);
+
+                        ctx.fillStyle = '#f1c40f';
+                        ctx.fillText(sb.text, sb.x, sb.y - 12);
+                    });
+                }
+
+                ctx.restore();
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        requestAnimationFrame(draw);
+    </script>
+</body>
+</html>
             display: none !important;
         }
         input, button {
