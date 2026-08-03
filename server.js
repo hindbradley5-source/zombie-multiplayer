@@ -31,7 +31,6 @@ io.on('connection', (socket) => {
         socket.roomCode = code;
         socket.join(code);
 
-        // Add creator as default marksman in the lobby
         const stats = classData['marksman'];
         rooms[code].players[socket.id] = {
             x: 400, y: 300,
@@ -47,7 +46,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('joinParty', (code) => {
-        const upperCode = code.toUpperCase();
+        const upperCode = code ? code.trim().toUpperCase() : '';
         if (rooms[upperCode] && !rooms[upperCode].gameStarted) {
             socket.roomCode = upperCode;
             socket.join(upperCode);
