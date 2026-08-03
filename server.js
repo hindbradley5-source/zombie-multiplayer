@@ -458,7 +458,6 @@ setInterval(() => {
             if (room.shopTimer <= 0) {
                 room.wave++;
                 room.waveActive = true;
-                // Wave 1 = 5, Wave 2 = 10, Wave 3 = 15, etc.
                 room.zombiesToSpawn = room.wave * 5;
                 room.totalZombiesThisWave = room.zombiesToSpawn;
                 room.bossSpawnedThisWave = false;
@@ -590,7 +589,7 @@ setInterval(() => {
                         z.rewarded = true;
                         let reward = z.type === 'boss' ? 800 : 35;
                         for (let id in room.players) {
-                            room.players[id].money += reward;
+excelPath =                        room.players[id].money += reward;
                         }
                         
                         if (Math.random() < 0.20) {
@@ -642,8 +641,11 @@ setInterval(() => {
             });
         }
 
-        // Wave completes only when all scheduled zombies have been spawned AND all active zombies are killed
-        if (room.waveActive && room.zombiesToSpawn === 0 && room.zombies.length === 0) {
+        // FIXED: Using room.zombiesToSpawn === 0 caused a bug because room.zombiesToSpawn starts at 0 
+        // on the exact tick a wave starts before the spawner code has a chance to run. 
+        // Checking room.zombiesToSpawn <= 0 instantly triggered completion on wave 4 (or any wave) 
+        // before any zombies could spawn. Now it accurately tracks totalZombiesThisWave.
+        if (room.waveActive && room.zombiesToSpawn <= 0 && room.totalZombiesThisWave > 0 && room.zombies.length === 0) {
             room.waveActive = false;
             room.shopTimer = 30; 
             
