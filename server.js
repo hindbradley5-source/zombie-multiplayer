@@ -36,6 +36,7 @@ io.on('connection', (socket) => {
             bullets: [],
             zombies: [],
             pickups: [],
+            barrels: [],
             wave: 1,
             zombiesToSpawn: 15,
             waveActive: false,
@@ -55,8 +56,24 @@ io.on('connection', (socket) => {
             baseClass: 'marksman',
             weaponType: 'pistol',
             hasForceField: false,
+            dashCooldown: 0,
+            powerUpType: null,
+            powerUpTimer: 0,
             ...stats 
         };
+
+        // Spawn initial explosive barrels
+        for(let i=0; i<3; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let dist = Math.random() * (ARENA_RADIUS - 100);
+            rooms[code].barrels.push({
+                x: ARENA_CENTER_X + Math.cos(angle) * dist,
+                y: ARENA_CENTER_Y + Math.sin(angle) * dist,
+                hp: 50,
+                maxHp: 50,
+                size: 25
+            });
+        }
 
         socket.emit('partyCreated', code);
         io.to(code).emit('lobbyUpdate', rooms[code].players);
@@ -80,6 +97,9 @@ io.on('connection', (socket) => {
                 baseClass: 'marksman',
                 weaponType: 'pistol',
                 hasForceField: false,
+                dashCooldown: 0,
+                powerUpType: null,
+                powerUpTimer: 0,
                 ...stats 
             };
 
@@ -112,6 +132,7 @@ io.on('connection', (socket) => {
             room.players[socket.id].maxAmmo = stats.maxAmmo !== undefined ? stats.maxAmmo : 0;
             room.players[socket.id].weaponType = stats.weaponType || 'pistol';
             room.players[socket.id].hasForceField = false;
+            room.players[socket.id].dashCooldown = 0;
             room.players[socket.id].reloading = false;
         }
 
@@ -135,12 +156,30 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
-        if (input.up) p.y -= p.speed;
-        if (input.down) p.y += p.speed;
-        if (input.left) p.x -= p.speed;
-        if (input.right) p.x += p.speed;
+        let currentSpeed = p.speed;
+        if (p.powerUpType === 'speed') currentSpeed *= 1.6;
 
-        // Circular boundary restriction
+        if (p.dashCooldown > 0) p.dashCooldown--;
+
+        if (input.dash && p.dashCooldown === 0) {
+            let dx = 0, dy = 0;
+            if (input.up) dy -= 1;
+            if (input.down) dy += 1;
+            if (input.left) dx -= 1;
+            if (input.right) dx += 1;
+            if (dx !== 0 || dy !== 0) {
+                let len = Math.hypot(dx, dy);
+                p.x += (dx / len) * 120; // Dash distance
+                p.y += (dy / len) * 120;
+                p.dashCooldown = 45; // Cooldown frames
+            }
+        }
+
+        if (input.up) p.y -= currentSpeed;
+        if (input.down) p.y += currentSpeed;
+        if (input.left) p.x -= currentSpeed;
+        if (input.right) p.x += currentSpeed;
+
         let distFromCenter = Math.hypot((p.x + p.size/2) - ARENA_CENTER_X, (p.y + p.size/2) - ARENA_CENTER_Y);
         let maxDist = ARENA_RADIUS - (p.size / 2);
         if (distFromCenter > maxDist) {
@@ -187,6 +226,8 @@ io.on('connection', (socket) => {
         }
 
         const baseAngle = Math.atan2(target.y - (p.y + p.size/2), target.x - (p.x + p.size/2));
+        let dmgMultiplier = p.powerUpType === 'doubleDamage' ? 2 : 1;
+        let finalDamage = p.damage * dmgMultiplier;
 
         if (p.weaponType === 'megaWeapon') {
             for (let i = 0; i < 12; i++) {
@@ -198,7 +239,7 @@ io.on('connection', (socket) => {
                     dy: Math.sin(angle),
                     speed: p.bulletSpeed * 1.5,
                     size: p.bulletSize * 2,
-                    damage: p.damage,
+                    damage: finalDamage,
                     owner: socket.id,
                     life: 80
                 });
@@ -213,58 +254,12 @@ io.on('connection', (socket) => {
                     dy: Math.sin(angle),
                     speed: p.bulletSpeed,
                     size: p.bulletSize,
-                    damage: p.damage,
+                    damage: finalDamage,
                     owner: socket.id,
                     life: 60
                 });
             }
-        } else if (p.class === 'melee' && p.weaponType === 'fireAx') {
-            for (let i = -1; i <= 1; i++) {
-                const angle = baseAngle + (i * 0.2);
-                room.bullets.push({
-                    x: p.x + p.size/2,
-                    y: p.y + p.size/2,
-                    dx: Math.cos(angle),
-                    dy: Math.sin(angle),
-                    speed: p.bulletSpeed,
-                    size: p.bulletSize,
-                    damage: p.damage,
-                    owner: socket.id,
-                    life: 8
-                });
-            }
-        } else if (p.class === 'melee' && p.weaponType === 'katana') {
-            for (let i = -2; i <= 2; i++) {
-                const angle = baseAngle + (i * 0.12);
-                room.bullets.push({
-                    x: p.x + p.size/2,
-                    y: p.y + p.size/2,
-                    dx: Math.cos(angle),
-                    dy: Math.sin(angle),
-                    speed: p.bulletSpeed,
-                    size: p.bulletSize,
-                    damage: p.damage,
-                    owner: socket.id,
-                    life: 10
-                });
-            }
-        } else if (p.class === 'mage' && p.weaponType === 'lightning') {
-            for (let i = -1; i <= 1; i++) {
-                const angle = baseAngle + (i * 0.1);
-                room.bullets.push({
-                    x: p.x + p.size/2,
-                    y: p.y + p.size/2,
-                    dx: Math.cos(angle),
-                    dy: Math.sin(angle),
-                    speed: p.bulletSpeed * 1.3,
-                    size: p.bulletSize * 0.7,
-                    damage: p.damage * 0.75,
-                    owner: socket.id,
-                    life: 50
-                });
-            }
         } else {
-            const lifespan = p.class === 'melee' ? 10 : 60; 
             room.bullets.push({
                 x: p.x + p.size/2,
                 y: p.y + p.size/2,
@@ -272,9 +267,9 @@ io.on('connection', (socket) => {
                 dy: Math.sin(baseAngle),
                 speed: p.bulletSpeed,
                 size: p.bulletSize,
-                damage: p.damage,
+                damage: finalDamage,
                 owner: socket.id,
-                life: lifespan 
+                life: p.class === 'melee' ? 10 : 60
             });
         }
     });
@@ -306,16 +301,15 @@ io.on('connection', (socket) => {
             p.hp = p.maxHp;
         } else if (item === 'maxHealth' && p.money >= 120) {
             p.money -= 120;
-            p.maxHp += Math.round(base.maxHp * 0.10); // +10% of base
+            p.maxHp += Math.round(base.maxHp * 0.10);
             p.hp = p.maxHp;
         } else if (item === 'damage' && p.money >= 100) {
             p.money -= 100;
-            p.damage += Math.max(1, Math.round(base.damage * 0.01)); // +1% of base
+            p.damage += Math.max(1, Math.round(base.damage * 0.01));
         } else if (item === 'speed' && p.money >= 75) {
             p.money -= 75;
-            p.speed += Number((base.speed * 0.01).toFixed(2)); // +1% of base
-        } 
-        else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun' && p.weaponType !== 'megaWeapon') {
+            p.speed += Number((base.speed * 0.01).toFixed(2));
+        } else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun' && p.weaponType !== 'megaWeapon') {
             p.money -= 150;
             p.weaponType = 'shotgun';
             p.maxAmmo = 8;
@@ -327,9 +321,8 @@ io.on('connection', (socket) => {
             p.maxAmmo = 200;
             p.ammo = 200;
             p.damage = 15;
-            p.bulletSize = base.bulletSize * 3; // Tripled bullet size
-        }
-        else if (item === 'fireStaff' && p.class === 'mage' && p.money >= 160 && p.weaponType !== 'fireStaff' && p.weaponType !== 'lightning' && p.weaponType !== 'megaWeapon') {
+            p.bulletSize = base.bulletSize * 3;
+        } else if (item === 'fireStaff' && p.class === 'mage' && p.money >= 160 && p.weaponType !== 'fireStaff' && p.weaponType !== 'lightning' && p.weaponType !== 'megaWeapon') {
             p.money -= 160;
             p.weaponType = 'fireStaff';
             p.bulletSize = 26;
@@ -341,8 +334,7 @@ io.on('connection', (socket) => {
             p.bulletSize = 10;
             p.damage = 140;
             p.manaCost = 18;
-        }
-        else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana' && p.weaponType !== 'megaWeapon') {
+        } else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana' && p.weaponType !== 'megaWeapon') {
             p.money -= 130;
             p.weaponType = 'fireAx';
             p.bulletSize = 16;
@@ -353,8 +345,7 @@ io.on('connection', (socket) => {
             p.bulletSize = 14;
             p.damage = 320;
             p.speed += base.speed * 0.05; 
-        }
-        else if (item === 'megaWeapon' && p.money >= 100000 && p.weaponType !== 'megaWeapon') {
+        } else if (item === 'megaWeapon' && p.money >= 100000 && p.weaponType !== 'megaWeapon') {
             p.money -= 100000;
             p.weaponType = 'megaWeapon';
             p.damage *= 2.5;
@@ -384,9 +375,12 @@ setInterval(() => {
             if (p.class === 'mage' && p.mana < p.maxMana && p.hp > 0) {
                 p.mana = Math.min(p.maxMana, p.mana + 0.6); 
             }
+            if (p.powerUpTimer > 0) {
+                p.powerUpTimer--;
+                if (p.powerUpTimer === 0) p.powerUpType = null;
+            }
         }
 
-        // Faster spawning rate
         if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.25) {
             let zType = 'normal';
             let roll = Math.random(); 
@@ -405,7 +399,7 @@ setInterval(() => {
             let zSize = 35;
 
             if (zType === 'boss') {
-                zHp = 3500 + (room.wave * 800); // Powerful boss
+                zHp = 3500 + (room.wave * 800);
                 zSpeed = 1.8 + (room.wave * 0.03);
                 zSize = 105;
             } else if (zType === 'tank') {
@@ -418,7 +412,6 @@ setInterval(() => {
                 zSize = 25;          
             }
 
-            // Spawn along outer circle boundary
             let spawnAngle = Math.random() * Math.PI * 2;
             let spawnX = ARENA_CENTER_X + Math.cos(spawnAngle) * ARENA_RADIUS;
             let spawnY = ARENA_CENTER_Y + Math.sin(spawnAngle) * ARENA_RADIUS;
@@ -456,7 +449,7 @@ setInterval(() => {
                 let hitDistance = z.type === 'boss' ? 70 : 35;
                 if (minDist < hitDistance) {
                     if (closest.hasForceField) {
-                        z.hp -= 40; // Force field damage
+                        z.hp -= 40;
                         z.x -= Math.cos(angle) * 35;
                         z.y -= Math.sin(angle) * 35;
                     } else {
@@ -466,6 +459,7 @@ setInterval(() => {
             }
         });
 
+        // Bullet & Barrel collision
         room.bullets.forEach((b) => {
             b.x += b.dx * b.speed;
             b.y += b.dy * b.speed;
@@ -477,6 +471,22 @@ setInterval(() => {
                 return;
             }
 
+            room.barrels.forEach(barrel => {
+                if (b.x > barrel.x && b.x < barrel.x + barrel.size && b.y > barrel.y && b.y < barrel.y + barrel.size) {
+                    barrel.hp -= b.damage;
+                    b.markedForDeletion = true;
+                    if (barrel.hp <= 0 && !barrel.exploded) {
+                        barrel.exploded = true;
+                        // Explosion damages zombies
+                        room.zombies.forEach(z => {
+                            if (Math.hypot(z.x - barrel.x, z.y - barrel.y) < 140) {
+                                z.hp -= 500;
+                            }
+                        });
+                    }
+                }
+            });
+
             room.zombies.forEach((z) => {
                 if (b.x > z.x && b.x < z.x + z.size && b.y > z.y && b.y < z.y + z.size) {
                     z.hp -= b.damage;
@@ -486,6 +496,17 @@ setInterval(() => {
                         z.rewarded = true;
                         if (b.owner && room.players[b.owner]) {
                             room.players[b.owner].money += (z.type === 'boss' ? 500 : 20);
+                            
+                            // Chance to drop powerup
+                            if (Math.random() < 0.20) {
+                                let pTypes = ['speed', 'doubleDamage', 'nuke'];
+                                let chosenType = pTypes[Math.floor(Math.random() * pTypes.length)];
+                                if (chosenType === 'nuke') {
+                                    room.zombies.forEach(zm => zm.hp = 0);
+                                } else {
+                                    room.pickups.push({ x: z.x, y: z.y, type: chosenType });
+                                }
+                            }
                         }
                     }
                 }
@@ -494,6 +515,7 @@ setInterval(() => {
 
         room.bullets = room.bullets.filter(b => !b.markedForDeletion);
         room.zombies = room.zombies.filter(z => z.hp > 0);
+        room.barrels = room.barrels.filter(barrel => !barrel.exploded);
 
         for (let id in room.players) {
             let p = room.players[id];
@@ -502,7 +524,12 @@ setInterval(() => {
             room.pickups.forEach((pickup, index) => {
                 let dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
                 if (dist < 35) {
-                    p.hp = Math.min(p.maxHp, p.hp + 50); 
+                    if (pickup.type === 'health') {
+                        p.hp = Math.min(p.maxHp, p.hp + 50);
+                    } else {
+                        p.powerUpType = pickup.type;
+                        p.powerUpTimer = 300; // 10 seconds duration
+                    }
                     room.pickups.splice(index, 1); 
                 }
             });
@@ -524,7 +551,19 @@ setInterval(() => {
                 type: 'health'
             });
 
-            // Shorter wave delay (2 seconds)
+            // Respawn barrels
+            for(let i=0; i<2; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let dist = Math.random() * (ARENA_RADIUS - 100);
+                room.barrels.push({
+                    x: ARENA_CENTER_X + Math.cos(angle) * dist,
+                    y: ARENA_CENTER_Y + Math.sin(angle) * dist,
+                    hp: 50,
+                    maxHp: 50,
+                    size: 25
+                });
+            }
+
             setTimeout(() => {
                 if (rooms[code] && rooms[code].gameStarted) {
                     rooms[code].wave++;
@@ -540,6 +579,7 @@ setInterval(() => {
             bullets: room.bullets,
             zombies: room.zombies,
             pickups: room.pickups,
+            barrels: room.barrels,
             wave: room.wave,
             waveActive: room.waveActive
         });
