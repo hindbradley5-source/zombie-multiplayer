@@ -67,7 +67,7 @@
             left: 10px;
             z-index: 5;
             pointer-events: none;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             text-shadow: 1px 1px 2px #000;
         }
@@ -92,7 +92,10 @@
     <div id="game-container">
         <!-- HUD -->
         <div id="hud" class="hidden">
-            Wave: <span id="wave-display">1</span> | Money: $<span id="money-display">0</span> | HP: <span id="hp-display">100</span>
+            Wave: <span id="wave-display">1</span> | 
+            Money: $<span id="money-display">0</span> | 
+            HP: <span id="hp-display">100</span> 
+            <span id="extra-stat" style="color: #f1c40f; margin-left: 10px;"></span>
         </div>
 
         <!-- Shop -->
@@ -148,36 +151,20 @@
         const playerList = document.getElementById('player-list');
         const errorMsg = document.getElementById('error-msg');
         const startGameBtn = document.getElementById('start-game-btn');
+        const extraStat = document.getElementById('extra-stat');
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
         let gameState = { players: {}, bullets: [], zombies: [], pickups: [], wave: 1, waveActive: false };
-        let myId = null;
 
-        function createParty() {
-            socket.emit('createParty');
-        }
-
-        function joinParty() {
-            const code = document.getElementById('party-code-input').value;
-            socket.emit('joinParty', code);
-        }
-
-        function selectClass(cls) {
-            socket.emit('selectClass', cls);
-        }
-
-        function startGame() {
-            socket.emit('startGame');
-        }
-
-        function buyItem(item) {
-            socket.emit('buy', item);
-        }
+        function createParty() { socket.emit('createParty'); }
+        function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
+        function selectClass(cls) { socket.emit('selectClass', cls); }
+        function startGame() { socket.emit('startGame'); }
+        function buyItem(item) { socket.emit('buy', item); }
 
         socket.on('partyCreated', (code) => {
-            myId = socket.id;
             mainMenu.classList.add('hidden');
             lobbyScreen.classList.remove('hidden');
             partyCodeDisplay.innerText = `Party Code: ${code}`;
@@ -185,15 +172,12 @@
         });
 
         socket.on('partyJoined', (code) => {
-            myId = socket.id;
             mainMenu.classList.add('hidden');
             lobbyScreen.classList.remove('hidden');
             partyCodeDisplay.innerText = `Party Code: ${code}`;
         });
 
-        socket.on('partyError', (msg) => {
-            errorMsg.innerText = msg;
-        });
+        socket.on('partyError', (msg) => { errorMsg.innerText = msg; });
 
         socket.on('lobbyUpdate', (players) => {
             playerList.innerHTML = '';
@@ -210,41 +194,38 @@
             hud.classList.remove('hidden');
         });
 
-        socket.on('stateUpdate', (state) => {
-            gameState = state;
-        });
+        socket.on('stateUpdate', (state) => { gameState = state; });
 
         const keys = {};
-        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'r') {
+                socket.emit('reload');
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
-        // Optimized input loop (runs smoothly at 30 updates/sec to eliminate network lag)
+        // Streamlined input ticker to avoid lag
         setInterval(() => {
             if (!lobbyScreen.classList.contains('hidden')) return;
-            let input = {
+            socket.emit('move', {
                 up: keys['w'] || keys['arrowup'],
                 down: keys['s'] || keys['arrowdown'],
                 left: keys['a'] || keys['arrowleft'],
                 right: keys['d'] || keys['arrowright']
-            };
-            socket.emit('move', input);
+            });
         }, 1000 / 30);
 
         canvas.addEventListener('click', (e) => {
             if (!lobbyScreen.classList.contains('hidden')) return;
             const rect = canvas.getBoundingClientRect();
-            const target = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            };
-            socket.emit('shoot', target);
+            socket.emit('shoot', { x: e.clientX - rect.left, y: e.clientY - rect.top });
         });
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (lobbyScreen.classList.contains('hidden')) {
-                // Draw Health Pickups (Medkits)
                 gameState.pickups.forEach(p => {
                     ctx.font = '24px Arial';
                     ctx.textAlign = 'center';
@@ -252,7 +233,6 @@
                     ctx.fillText('❤️', p.x, p.y);
                 });
 
-                // Draw Bullets
                 ctx.fillStyle = '#f39c12';
                 gameState.bullets.forEach(b => {
                     ctx.beginPath();
@@ -260,7 +240,6 @@
                     ctx.fill();
                 });
 
-                // Draw Zombies using clean Emojis 🧟
                 gameState.zombies.forEach(z => {
                     ctx.font = `${z.size * 1.2}px Arial`;
                     ctx.textAlign = 'center';
@@ -268,7 +247,6 @@
                     ctx.fillText('🧟', z.x + z.size / 2, z.y + z.size / 2);
                 });
 
-                // Draw Players using clean Emojis 🤠
                 for (let id in gameState.players) {
                     let p = gameState.players[id];
                     ctx.font = `${p.size * 1.2}px Arial`;
@@ -276,18 +254,26 @@
                     ctx.textBaseline = 'middle';
                     ctx.fillText('🤠', p.x + p.size / 2, p.y + p.size / 2);
 
-                    // Health Bar above player
                     ctx.fillStyle = '#ff0000';
                     ctx.fillRect(p.x, p.y - 10, p.size, 4);
                     ctx.fillStyle = '#00ff00';
                     ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
                 }
 
-                // Update HUD texts
+                // HUD DOM updates
                 document.getElementById('wave-display').innerText = gameState.wave;
-                if (gameState.players[socket.id]) {
-                    document.getElementById('money-display').innerText = gameState.players[socket.id].money;
-                    document.getElementById('hp-display').innerText = Math.max(0, gameState.players[socket.id].hp);
+                let me = gameState.players[socket.id];
+                if (me) {
+                    document.getElementById('money-display').innerText = me.money;
+                    document.getElementById('hp-display').innerText = Math.max(0, me.hp);
+
+                    if (me.class === 'marksman') {
+                        extraStat.innerText = me.reloading ? '| Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo} (Press R)`;
+                    } else if (me.class === 'mage') {
+                        extraStat.innerText = `| Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
+                    } else {
+                        extraStat.innerText = '| Melee (Infinite)';
+                    }
                 }
 
                 if (!gameState.waveActive) {
