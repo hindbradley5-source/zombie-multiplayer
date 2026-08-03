@@ -7,9 +7,9 @@ app.use(express.static('public'));
 
 const rooms = {};
 
-const ARENA_CENTER_X = 500;
-const ARENA_CENTER_Y = 500;
-const ARENA_RADIUS = 460;
+const ARENA_CENTER_X = 1000;
+const ARENA_CENTER_Y = 1000;
+const ARENA_RADIUS = 950;
 
 const classData = {
     mage: { color: '#9b59b6', speed: 5.5, maxHp: 120, bulletSpeed: 9, bulletSize: 18, damage: 110, mana: 120, maxMana: 120, manaCost: 12, weaponType: 'orb' },
@@ -41,7 +41,8 @@ io.on('connection', (socket) => {
             zombiesToSpawn: 15,
             waveActive: false,
             gameStarted: false,
-            bossSpawnedThisWave: false
+            bossSpawnedThisWave: false,
+            shopTimer: 30
         };
         socket.roomCode = code;
         socket.join(code);
@@ -62,16 +63,15 @@ io.on('connection', (socket) => {
             ...stats 
         };
 
-        // Spawn initial explosive barrels
-        for(let i=0; i<3; i++) {
+        for(let i=0; i<6; i++) {
             let angle = Math.random() * Math.PI * 2;
-            let dist = Math.random() * (ARENA_RADIUS - 100);
+            let dist = Math.random() * (ARENA_RADIUS - 200);
             rooms[code].barrels.push({
                 x: ARENA_CENTER_X + Math.cos(angle) * dist,
                 y: ARENA_CENTER_Y + Math.sin(angle) * dist,
                 hp: 50,
                 maxHp: 50,
-                size: 25
+                size: 35
             });
         }
 
@@ -169,9 +169,9 @@ io.on('connection', (socket) => {
             if (input.right) dx += 1;
             if (dx !== 0 || dy !== 0) {
                 let len = Math.hypot(dx, dy);
-                p.x += (dx / len) * 120; // Dash distance
-                p.y += (dy / len) * 120;
-                p.dashCooldown = 45; // Cooldown frames
+                p.x += (dx / len) * 140; 
+                p.y += (dy / len) * 140;
+                p.dashCooldown = 45; 
             }
         }
 
@@ -269,7 +269,7 @@ io.on('connection', (socket) => {
                 size: p.bulletSize,
                 damage: finalDamage,
                 owner: socket.id,
-                life: p.class === 'melee' ? 10 : 60
+                life: p.class === 'melee' ? 12 : 60
             });
         }
     });
@@ -337,12 +337,12 @@ io.on('connection', (socket) => {
         } else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana' && p.weaponType !== 'megaWeapon') {
             p.money -= 130;
             p.weaponType = 'fireAx';
-            p.bulletSize = 16;
+            p.bulletSize = 18;
             p.damage = 240;
         } else if (item === 'katana' && p.class === 'melee' && p.money >= 240 && p.weaponType !== 'katana' && p.weaponType !== 'megaWeapon') {
             p.money -= 240;
             p.weaponType = 'katana';
-            p.bulletSize = 14;
+            p.bulletSize = 16;
             p.damage = 320;
             p.speed += base.speed * 0.05; 
         } else if (item === 'megaWeapon' && p.money >= 100000 && p.weaponType !== 'megaWeapon') {
@@ -381,52 +381,63 @@ setInterval(() => {
             }
         }
 
-        if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.25) {
-            let zType = 'normal';
-            let roll = Math.random(); 
-            
-            if (room.wave % 10 === 0 && !room.bossSpawnedThisWave) {
-                zType = 'boss';
-                room.bossSpawnedThisWave = true;
-            } else if (room.wave >= 2 && roll < 0.30) {
-                zType = 'tank';
-            } else if (room.wave >= 3 && roll > 0.60) {
-                zType = 'runner';
+        if (!room.waveActive) {
+            room.shopTimer -= 1/30;
+            if (room.shopTimer <= 0) {
+                room.wave++;
+                room.waveActive = true;
+                room.zombiesToSpawn = 15 + (room.wave * 18);
+                room.bossSpawnedThisWave = false;
+                room.shopTimer = 30;
             }
+        } else {
+            if (room.zombiesToSpawn > 0 && Math.random() < 0.25) {
+                let zType = 'normal';
+                let roll = Math.random(); 
+                
+                if (room.wave % 10 === 0 && !room.bossSpawnedThisWave) {
+                    zType = 'boss';
+                    room.bossSpawnedThisWave = true;
+                } else if (room.wave >= 2 && roll < 0.30) {
+                    zType = 'tank';
+                } else if (room.wave >= 3 && roll > 0.60) {
+                    zType = 'runner';
+                }
 
-            let zHp = 35 + (room.wave * 12);
-            let zSpeed = 1.2 + (room.wave * 0.12);
-            let zSize = 35;
+                let zHp = 35 + (room.wave * 12);
+                let zSpeed = 1.2 + (room.wave * 0.12);
+                let zSize = 40;
 
-            if (zType === 'boss') {
-                zHp = 3500 + (room.wave * 800);
-                zSpeed = 1.8 + (room.wave * 0.03);
-                zSize = 105;
-            } else if (zType === 'tank') {
-                zHp = zHp * 5;       
-                zSpeed = zSpeed * 0.35; 
-                zSize = 55;          
-            } else if (zType === 'runner') {
-                zHp = zHp * 0.6;     
-                zSpeed = zSpeed * 1.9; 
-                zSize = 25;          
+                if (zType === 'boss') {
+                    zHp = 3500 + (room.wave * 800);
+                    zSpeed = 1.8 + (room.wave * 0.03);
+                    zSize = 120;
+                } else if (zType === 'tank') {
+                    zHp = zHp * 5;       
+                    zSpeed = zSpeed * 0.35; 
+                    zSize = 65;          
+                } else if (zType === 'runner') {
+                    zHp = zHp * 0.6;     
+                    zSpeed = zSpeed * 1.9; 
+                    zSize = 30;          
+                }
+
+                let spawnAngle = Math.random() * Math.PI * 2;
+                let spawnX = ARENA_CENTER_X + Math.cos(spawnAngle) * ARENA_RADIUS;
+                let spawnY = ARENA_CENTER_Y + Math.sin(spawnAngle) * ARENA_RADIUS;
+
+                room.zombies.push({
+                    x: spawnX,
+                    y: spawnY,
+                    size: zSize,
+                    hp: zHp,
+                    maxHp: zHp,
+                    speed: zSpeed,
+                    type: zType,
+                    rewarded: false
+                });
+                room.zombiesToSpawn--;
             }
-
-            let spawnAngle = Math.random() * Math.PI * 2;
-            let spawnX = ARENA_CENTER_X + Math.cos(spawnAngle) * ARENA_RADIUS;
-            let spawnY = ARENA_CENTER_Y + Math.sin(spawnAngle) * ARENA_RADIUS;
-
-            room.zombies.push({
-                x: spawnX,
-                y: spawnY,
-                size: zSize,
-                hp: zHp,
-                maxHp: zHp,
-                speed: zSpeed,
-                type: zType,
-                rewarded: false
-            });
-            room.zombiesToSpawn--;
         }
 
         room.zombies.forEach(z => {
@@ -446,7 +457,7 @@ setInterval(() => {
                 z.x += Math.cos(angle) * z.speed;
                 z.y += Math.sin(angle) * z.speed;
 
-                let hitDistance = z.type === 'boss' ? 70 : 35;
+                let hitDistance = z.type === 'boss' ? 80 : 40;
                 if (minDist < hitDistance) {
                     if (closest.hasForceField) {
                         z.hp -= 40;
@@ -459,7 +470,6 @@ setInterval(() => {
             }
         });
 
-        // Bullet & Barrel collision
         room.bullets.forEach((b) => {
             b.x += b.dx * b.speed;
             b.y += b.dy * b.speed;
@@ -477,9 +487,8 @@ setInterval(() => {
                     b.markedForDeletion = true;
                     if (barrel.hp <= 0 && !barrel.exploded) {
                         barrel.exploded = true;
-                        // Explosion damages zombies
                         room.zombies.forEach(z => {
-                            if (Math.hypot(z.x - barrel.x, z.y - barrel.y) < 140) {
+                            if (Math.hypot(z.x - barrel.x, z.y - barrel.y) < 160) {
                                 z.hp -= 500;
                             }
                         });
@@ -497,7 +506,6 @@ setInterval(() => {
                         if (b.owner && room.players[b.owner]) {
                             room.players[b.owner].money += (z.type === 'boss' ? 500 : 20);
                             
-                            // Chance to drop powerup
                             if (Math.random() < 0.20) {
                                 let pTypes = ['speed', 'doubleDamage', 'nuke'];
                                 let chosenType = pTypes[Math.floor(Math.random() * pTypes.length)];
@@ -523,12 +531,12 @@ setInterval(() => {
 
             room.pickups.forEach((pickup, index) => {
                 let dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
-                if (dist < 35) {
+                if (dist < 40) {
                     if (pickup.type === 'health') {
                         p.hp = Math.min(p.maxHp, p.hp + 50);
                     } else {
                         p.powerUpType = pickup.type;
-                        p.powerUpTimer = 300; // 10 seconds duration
+                        p.powerUpTimer = 300; 
                     }
                     room.pickups.splice(index, 1); 
                 }
@@ -537,6 +545,7 @@ setInterval(() => {
 
         if (room.waveActive && room.zombiesToSpawn <= 0 && room.zombies.length === 0) {
             room.waveActive = false;
+            room.shopTimer = 30; // 30 seconds shop break
             
             let roundBonus = 60 + (room.wave * 35);
             for (let id in room.players) {
@@ -551,27 +560,17 @@ setInterval(() => {
                 type: 'health'
             });
 
-            // Respawn barrels
-            for(let i=0; i<2; i++) {
+            for(let i=0; i<3; i++) {
                 let angle = Math.random() * Math.PI * 2;
-                let dist = Math.random() * (ARENA_RADIUS - 100);
+                let dist = Math.random() * (ARENA_RADIUS - 200);
                 room.barrels.push({
                     x: ARENA_CENTER_X + Math.cos(angle) * dist,
                     y: ARENA_CENTER_Y + Math.sin(angle) * dist,
                     hp: 50,
                     maxHp: 50,
-                    size: 25
+                    size: 35
                 });
             }
-
-            setTimeout(() => {
-                if (rooms[code] && rooms[code].gameStarted) {
-                    rooms[code].wave++;
-                    rooms[code].waveActive = true;
-                    rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 18);
-                    rooms[code].bossSpawnedThisWave = false;
-                }
-            }, 2000); 
         }
 
         io.to(code).emit('stateUpdate', {
@@ -581,7 +580,8 @@ setInterval(() => {
             pickups: room.pickups,
             barrels: room.barrels,
             wave: room.wave,
-            waveActive: room.waveActive
+            waveActive: room.waveActive,
+            shopTimer: Math.ceil(room.shopTimer)
         });
     }
 }, 1000 / 30);
