@@ -97,32 +97,35 @@ io.on('connection', (socket) => {
     socket.on('joinParty', (code) => {
         const upperCode = code ? code.trim().toUpperCase() : '';
         
-        if (rooms[upperCode] && !rooms[upperCode].gameStarted) {
+        if (rooms[upperCode]) {
             socket.roomCode = upperCode;
             socket.join(upperCode);
 
             const stats = classData['marksman'];
-            rooms[upperCode].players[socket.id] = {
-                x: ARENA_CENTER_X + (Math.random() * 40 - 20), 
-                y: ARENA_CENTER_Y + (Math.random() * 40 - 20),
-                size: 35,
-                hp: stats.maxHp,
-                money: 0,
-                class: 'marksman',
-                baseClass: 'marksman',
-                avatar: '🤠',
-                weaponType: 'pistol',
-                hasForceField: false,
-                dashCooldown: 0,
-                powerUpType: null,
-                powerUpTimer: 0,
-                ...stats 
-            };
+            // Only add if not already present or reset if needed
+            if (!rooms[upperCode].players[socket.id]) {
+                rooms[upperCode].players[socket.id] = {
+                    x: ARENA_CENTER_X + (Math.random() * 40 - 20), 
+                    y: ARENA_CENTER_Y + (Math.random() * 40 - 20),
+                    size: 35,
+                    hp: stats.maxHp,
+                    money: 0,
+                    class: 'marksman',
+                    baseClass: 'marksman',
+                    avatar: '🤠',
+                    weaponType: 'pistol',
+                    hasForceField: false,
+                    dashCooldown: 0,
+                    powerUpType: null,
+                    powerUpTimer: 0,
+                    ...stats 
+                };
+            }
 
             socket.emit('partyJoined', upperCode);
             io.to(upperCode).emit('lobbyUpdate', rooms[upperCode].players);
         } else {
-            socket.emit('partyError', 'Party code not found or game already started!');
+            socket.emit('partyError', 'Party code not found!');
         }
     });
 
@@ -312,8 +315,8 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (p && p.hp <= 0) {
             p.hp = p.maxHp;
-            p.x = ARENA_CENTER_X;
-            p.y = ARENA_CENTER_Y;
+            p.x = ARENA_CENTER_X + (Math.random() * 60 - 30);
+            p.y = ARENA_CENTER_Y + (Math.random() * 60 - 30);
             if (p.class === 'marksman') p.ammo = p.maxAmmo;
             if (p.class === 'mage') p.mana = p.maxMana;
             p.reloading = false;
@@ -535,7 +538,6 @@ setInterval(() => {
                         closest.hp -= (z.type === 'boss' ? 6 : 1);
                     }
                     if (wasAlive && closest.hp <= 0) {
-                        // Player just died from zombie hit! Trigger speech bubble
                         let quote = funnyQuotes[Math.floor(Math.random() * funnyQuotes.length)];
                         room.speechBubbles.push({
                             x: closest.x + closest.size/2,
