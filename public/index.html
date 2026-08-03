@@ -153,7 +153,7 @@
         }
 
         function joinParty() {
-            const code = codeInput.value.trim();
+            const code = codeInput.value.trim().toUpperCase();
             if (code.length === 4) {
                 socket.emit('joinParty', code);
             } else {
@@ -170,15 +170,15 @@
         }
 
         socket.on('partyCreated', (code) => {
-            currentPartyCode = code;
-            displayCode.innerText = code;
+            currentPartyCode = code.toUpperCase();
+            displayCode.innerText = currentPartyCode;
             mainMenu.style.display = 'none';
             lobbyMenu.style.display = 'block';
         });
 
         socket.on('partyJoined', (code) => {
-            currentPartyCode = code;
-            displayCode.innerText = code;
+            currentPartyCode = code.toUpperCase();
+            displayCode.innerText = currentPartyCode;
             joinMenu.style.display = 'none';
             lobbyMenu.style.display = 'block';
         });
