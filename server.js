@@ -282,7 +282,6 @@ io.on('connection', (socket) => {
             p.money -= 75;
             p.speed += 1;
         } 
-        // Marksman Weapons
         else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun') {
             p.money -= 150;
             p.weaponType = 'shotgun';
@@ -296,7 +295,6 @@ io.on('connection', (socket) => {
             p.ammo = 50;
             p.damage = 15;
         }
-        // Mage Weapons
         else if (item === 'fireStaff' && p.class === 'mage' && p.money >= 160 && p.weaponType !== 'fireStaff' && p.weaponType !== 'lightning') {
             p.money -= 160;
             p.weaponType = 'fireStaff';
@@ -310,7 +308,6 @@ io.on('connection', (socket) => {
             p.damage = 140;
             p.manaCost = 18;
         }
-        // Melee Weapons
         else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana') {
             p.money -= 130;
             p.weaponType = 'fireAx';
@@ -321,7 +318,7 @@ io.on('connection', (socket) => {
             p.weaponType = 'katana';
             p.bulletSize = 14;
             p.damage = 320;
-            p.speed += 1; // Extra mobility boost for Katana
+            p.speed += 1; 
         }
     });
 
