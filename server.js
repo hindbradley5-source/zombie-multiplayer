@@ -13,7 +13,6 @@ const classData = {
     marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 25 }
 };
 
-// Reliable 4-character code generator
 function generatePartyCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -34,7 +33,7 @@ io.on('connection', (socket) => {
             zombies: [],
             pickups: [],
             wave: 1,
-            zombiesToSpawn: 5,
+            zombiesToSpawn: 15, // Increased starting zombies
             waveActive: false,
             gameStarted: false
         };
@@ -44,21 +43,19 @@ io.on('connection', (socket) => {
         const stats = classData['marksman'];
         rooms[code].players[socket.id] = {
             x: 400, y: 300,
-            size: 25,
+            size: 35, // Slightly larger for sprites
             hp: stats.maxHp,
             money: 0,
             class: 'marksman',
             ...stats 
         };
 
-        console.log(`Party created with code: ${code}`);
         socket.emit('partyCreated', code);
         io.to(code).emit('lobbyUpdate', rooms[code].players);
     });
 
     socket.on('joinParty', (code) => {
         const upperCode = code ? code.trim().toUpperCase() : '';
-        console.log(`Player attempting to join code: ${upperCode}`);
         
         if (rooms[upperCode] && !rooms[upperCode].gameStarted) {
             socket.roomCode = upperCode;
@@ -68,7 +65,7 @@ io.on('connection', (socket) => {
             rooms[upperCode].players[socket.id] = {
                 x: 400 + Math.random() * 50 - 25, 
                 y: 300 + Math.random() * 50 - 25,
-                size: 25,
+                size: 35,
                 hp: stats.maxHp,
                 money: 0,
                 class: 'marksman',
@@ -107,7 +104,7 @@ io.on('connection', (socket) => {
 
         room.gameStarted = true;
         room.waveActive = true;
-        room.zombiesToSpawn = 5 + (room.wave * 3);
+        room.zombiesToSpawn = 15 + (room.wave * 10); // Much bigger waves
 
         io.to(socket.roomCode).emit('gameStarted');
     });
@@ -168,7 +165,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('Player disconnected:', socket.id);
         if (socket.roomCode && rooms[socket.roomCode]) {
             delete rooms[socket.roomCode].players[socket.id];
             if (Object.keys(rooms[socket.roomCode].players).length === 0) {
@@ -185,40 +181,39 @@ setInterval(() => {
         let room = rooms[code];
         if (!room.gameStarted) continue;
 
-        if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.02) {
+        // Increased spawn rate from 0.02 to 0.08 (zombies spawn much faster)
+        if (room.waveActive && room.zombiesToSpawn > 0 && Math.random() < 0.08) {
             let zType = 'normal';
             let roll = Math.random(); 
             
-            if (room.wave >= 2 && roll < 0.20) {
+            if (room.wave >= 2 && roll < 0.30) {
                 zType = 'tank';
-            } else if (room.wave >= 3 && roll > 0.70) {
+            } else if (room.wave >= 3 && roll > 0.60) {
                 zType = 'runner';
             }
 
             let zHp = 30 + (room.wave * 10);
-            let zSpeed = 1 + (room.wave * 0.1);
-            let zSize = 25;
+            let zSpeed = 1.2 + (room.wave * 0.1);
+            let zSize = 35;
             let zColor = '#e74c3c';
 
             if (zType === 'tank') {
                 zHp = zHp * 4;       
                 zSpeed = zSpeed * 0.4; 
-                zSize = 45;          
-                zColor = '#27ae60';  
+                zSize = 50;          
             } else if (zType === 'runner') {
                 zHp = zHp * 0.5;     
                 zSpeed = zSpeed * 1.8; 
-                zSize = 18;          
-                zColor = '#e67e22';  
+                zSize = 25;          
             }
 
             room.zombies.push({
-                x: Math.random() < 0.5 ? -30 : 830,
+                x: Math.random() < 0.5 ? -40 : 840,
                 y: Math.random() * 600,
                 size: zSize,
                 hp: zHp,
                 speed: zSpeed,
-                color: zColor,
+                type: zType,
                 rewarded: false
             });
             room.zombiesToSpawn--;
@@ -241,7 +236,7 @@ setInterval(() => {
                 z.x += Math.cos(angle) * z.speed;
                 z.y += Math.sin(angle) * z.speed;
 
-                if (minDist < 30) closest.hp -= 1;
+                if (minDist < 35) closest.hp -= 1;
             }
         });
 
@@ -279,7 +274,7 @@ setInterval(() => {
 
             room.pickups.forEach((pickup, index) => {
                 let dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
-                if (dist < 30) {
+                if (dist < 35) {
                     p.hp = Math.min(p.maxHp, p.hp + 50); 
                     room.pickups.splice(index, 1); 
                 }
@@ -295,13 +290,14 @@ setInterval(() => {
                 type: 'health'
             });
 
+            // Faster round turnaround (5 seconds instead of 10)
             setTimeout(() => {
                 if (rooms[code] && rooms[code].gameStarted) {
                     rooms[code].wave++;
                     rooms[code].waveActive = true;
-                    rooms[code].zombiesToSpawn = 5 + (rooms[code].wave * 3);
+                    rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 10);
                 }
-            }, 10000); 
+            }, 5000); 
         }
 
         io.to(code).emit('stateUpdate', {
