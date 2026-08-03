@@ -52,7 +52,8 @@ io.on('connection', (socket) => {
             explosions: [],
             speechBubbles: [],
             wave: 1,
-            zombiesToSpawn: 15,
+            zombiesToSpawn: 5,
+            totalZombiesThisWave: 5,
             waveActive: false,
             gameStarted: false,
             bossSpawnedThisWave: false,
@@ -173,7 +174,9 @@ io.on('connection', (socket) => {
 
         room.gameStarted = true;
         room.waveActive = true;
-        room.zombiesToSpawn = 15 + (room.wave * 15);
+        room.wave = 1;
+        room.zombiesToSpawn = 5;
+        room.totalZombiesThisWave = 5;
 
         io.to(socket.roomCode).emit('gameStarted');
     });
@@ -455,7 +458,9 @@ setInterval(() => {
             if (room.shopTimer <= 0) {
                 room.wave++;
                 room.waveActive = true;
-                room.zombiesToSpawn = 15 + (room.wave * 18);
+                // Wave 1 = 5, Wave 2 = 10, Wave 3 = 15, etc.
+                room.zombiesToSpawn = room.wave * 5;
+                room.totalZombiesThisWave = room.zombiesToSpawn;
                 room.bossSpawnedThisWave = false;
                 room.shopTimer = 30;
             }
@@ -623,7 +628,7 @@ setInterval(() => {
             let p = room.players[id];
             if (p.hp <= 0) continue;
 
-            room.pickups.forEach((pickup, index) => {
+            room.pickups.filter(Boolean).forEach((pickup, index) => {
                 let dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
                 if (dist < 40) {
                     if (pickup.type === 'health') {
@@ -637,7 +642,8 @@ setInterval(() => {
             });
         }
 
-        if (room.waveActive && room.zombiesToSpawn <= 0 && room.zombies.length === 0) {
+        // Wave completes only when all scheduled zombies have been spawned AND all active zombies are killed
+        if (room.waveActive && room.zombiesToSpawn === 0 && room.zombies.length === 0) {
             room.waveActive = false;
             room.shopTimer = 30; 
             
