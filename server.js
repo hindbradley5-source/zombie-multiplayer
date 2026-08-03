@@ -17,6 +17,18 @@ const classData = {
     marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 30, ammo: 15, maxAmmo: 15, weaponType: 'pistol', reloading: false, attackSpeed: 'Medium (0.6s)' }
 };
 
+const funnyQuotes = [
+    "Skill issue detected!",
+    "Bro forgot how to use WASD.",
+    "That zombie totally styled on you.",
+    "Alt+F4 won't save you now.",
+    "Rest in pixels.",
+    "Did you try dodging?",
+    "Absolute cinema of a fail.",
+    "Keyboard disconnected or just bad?",
+    "Oof size: Mega."
+];
+
 function generatePartyCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -38,6 +50,7 @@ io.on('connection', (socket) => {
             pickups: [],
             barrels: [],
             explosions: [],
+            speechBubbles: [],
             wave: 1,
             zombiesToSpawn: 15,
             waveActive: false,
@@ -56,6 +69,7 @@ io.on('connection', (socket) => {
             money: 0,
             class: 'marksman',
             baseClass: 'marksman',
+            avatar: '🤠',
             weaponType: 'pistol',
             hasForceField: false,
             dashCooldown: 0,
@@ -96,6 +110,7 @@ io.on('connection', (socket) => {
                 money: 0,
                 class: 'marksman',
                 baseClass: 'marksman',
+                avatar: '🤠',
                 weaponType: 'pistol',
                 hasForceField: false,
                 dashCooldown: 0,
@@ -138,6 +153,15 @@ io.on('connection', (socket) => {
             room.players[socket.id].attackSpeed = stats.attackSpeed;
         }
 
+        io.to(socket.roomCode).emit('lobbyUpdate', room.players);
+    });
+
+    socket.on('selectAvatar', (avatar) => {
+        const room = rooms[socket.roomCode];
+        if (!room) return;
+        if (room.players[socket.id]) {
+            room.players[socket.id].avatar = avatar;
+        }
         io.to(socket.roomCode).emit('lobbyUpdate', room.players);
     });
 
@@ -301,7 +325,6 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
-        // Allow class switching anytime in shop for 10,000
         if (!room.waveActive && (item === 'mage' || item === 'melee' || item === 'marksman')) {
             if (p.money >= 10000) {
                 p.money -= 10000;
@@ -503,12 +526,23 @@ setInterval(() => {
 
                 let hitDistance = z.type === 'boss' ? 80 : 40;
                 if (minDist < hitDistance) {
+                    let wasAlive = closest.hp > 0;
                     if (closest.hasForceField) {
                         z.hp -= 40;
                         z.x -= Math.cos(angle) * 35;
                         z.y -= Math.sin(angle) * 35;
                     } else {
                         closest.hp -= (z.type === 'boss' ? 6 : 1);
+                    }
+                    if (wasAlive && closest.hp <= 0) {
+                        // Player just died from zombie hit! Trigger speech bubble
+                        let quote = funnyQuotes[Math.floor(Math.random() * funnyQuotes.length)];
+                        room.speechBubbles.push({
+                            x: closest.x + closest.size/2,
+                            y: closest.y - 15,
+                            text: quote,
+                            life: 90
+                        });
                     }
                 }
             }
@@ -531,7 +565,6 @@ setInterval(() => {
                     b.markedForDeletion = true;
                     if (barrel.hp <= 0 && !barrel.exploded) {
                         barrel.exploded = true;
-                        // Trigger Explosion Effect & Radius Damage
                         room.explosions.push({ x: barrel.x + barrel.size/2, y: barrel.y + barrel.size/2, radius: 160, life: 15 });
                         room.zombies.forEach(z => {
                             if (Math.hypot((z.x + z.size/2) - (barrel.x + barrel.size/2), (z.y + z.size/2) - (barrel.y + barrel.size/2)) < 160) {
@@ -550,7 +583,6 @@ setInterval(() => {
                     if (z.hp <= 0 && !z.rewarded) {
                         z.rewarded = true;
                         let reward = z.type === 'boss' ? 800 : 35;
-                        // Shared Money: Both players get the reward
                         for (let id in room.players) {
                             room.players[id].money += reward;
                         }
@@ -569,10 +601,17 @@ setInterval(() => {
             });
         });
 
-        // Update active visual explosion animations
         if (room.explosions) {
             room.explosions.forEach(ex => ex.life--);
             room.explosions = room.explosions.filter(ex => ex.life > 0);
+        }
+
+        if (room.speechBubbles) {
+            room.speechBubbles.forEach(sb => {
+                sb.y -= 0.4;
+                sb.life--;
+            });
+            room.speechBubbles = room.speechBubbles.filter(sb => sb.life > 0);
         }
 
         room.bullets = room.bullets.filter(b => !b.markedForDeletion);
@@ -597,7 +636,6 @@ setInterval(() => {
             });
         }
 
-        // Wave ends ONLY when all spawns are finished AND all active zombies are killed
         if (room.waveActive && room.zombiesToSpawn <= 0 && room.zombies.length === 0) {
             room.waveActive = false;
             room.shopTimer = 30; 
@@ -635,6 +673,7 @@ setInterval(() => {
             pickups: room.pickups,
             barrels: room.barrels,
             explosions: room.explosions || [],
+            speechBubbles: room.speechBubbles || [],
             wave: room.wave,
             waveActive: room.waveActive,
             shopTimer: Math.ceil(room.shopTimer)
