@@ -102,7 +102,6 @@ io.on('connection', (socket) => {
             socket.join(upperCode);
 
             const stats = classData['marksman'];
-            // Only add if not already present or reset if needed
             if (!rooms[upperCode].players[socket.id]) {
                 rooms[upperCode].players[socket.id] = {
                     x: ARENA_CENTER_X + (Math.random() * 40 - 20), 
