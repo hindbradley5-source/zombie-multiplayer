@@ -75,7 +75,7 @@
             position: absolute;
             bottom: 10px;
             right: 10px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             padding: 10px;
             border: 1px solid #444;
             border-radius: 5px;
@@ -83,8 +83,10 @@
         }
         #shop button {
             padding: 5px 10px;
-            font-size: 12px;
+            font-size: 11px;
             margin: 2px;
+            display: block;
+            width: 160px;
         }
     </style>
 </head>
@@ -100,10 +102,13 @@
 
         <!-- Shop -->
         <div id="shop" class="hidden">
-            <h4>Shop (Between Waves)</h4>
-            <button onclick="buyItem('health')">Buy Health ($50)</button>
+            <h4 style="margin: 0 0 5px 0; text-align: center;">Shop (Between Waves)</h4>
+            <button onclick="buyItem('health')">Heal Full ($50)</button>
+            <button onclick="buyItem('maxHealth')">+30 Max HP ($120)</button>
             <button onclick="buyItem('damage')">Buy Damage ($100)</button>
             <button onclick="buyItem('speed')">Buy Speed ($75)</button>
+            <button onclick="buyItem('shotgun')" style="background: #e67e22;">Shotgun (Marksman) ($150)</button>
+            <button onclick="buyItem('minigun')" style="background: #c0392b;">Minigun (Marksman) ($250)</button>
         </div>
 
         <!-- Canvas -->
@@ -136,6 +141,8 @@
             </div>
             <br>
             <button id="start-game-btn" onclick="startGame()" class="hidden" style="background: #e67e22;">Start Game</button>
+            <br>
+            <button onclick="goToMainMenu()" style="background: #7f8c8d; font-size: 14px;">Main Menu</button>
         </div>
 
         <!-- Death Screen -->
@@ -143,6 +150,7 @@
             <h2 style="color: #e74c3c; font-size: 36px; margin-bottom: 5px;">YOU DIED</h2>
             <p style="color: #bbb; margin-bottom: 20px;">The zombies overwhelmed you.</p>
             <button onclick="respawnPlayer()" style="background: #e67e22; font-size: 18px;">Respawn</button>
+            <button onclick="goToMainMenu()" style="background: #7f8c8d; font-size: 16px; margin-top: 10px;">Main Menu</button>
         </div>
     </div>
 
@@ -172,6 +180,7 @@
         function startGame() { socket.emit('startGame'); }
         function respawnPlayer() { socket.emit('respawn'); }
         function buyItem(item) { socket.emit('buy', item); }
+        function goToMainMenu() { location.reload(); }
 
         socket.on('partyCreated', (code) => {
             mainMenu.classList.add('hidden');
@@ -203,7 +212,6 @@
             hud.classList.remove('hidden');
         });
 
-        // HUD and state updates happen here cleanly instead of inside the render frame loop
         socket.on('stateUpdate', (state) => {
             gameState = state;
 
@@ -211,7 +219,7 @@
             let me = gameState.players[socket.id];
             if (me) {
                 document.getElementById('money-display').innerText = me.money;
-                document.getElementById('hp-display').innerText = Math.max(0, me.hp);
+                document.getElementById('hp-display').innerText = `${Math.max(0, me.hp)}/${me.maxHp}`;
 
                 if (me.hp <= 0) {
                     deathScreen.classList.remove('hidden');
@@ -220,7 +228,8 @@
                 }
 
                 if (me.class === 'marksman') {
-                    extraStat.innerText = me.reloading ? '| Auto-Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo}`;
+                    let weaponName = me.weaponType ? me.weaponType.toUpperCase() : 'PISTOL';
+                    extraStat.innerText = me.reloading ? `| [${weaponName}] Auto-Reloading...` : `| [${weaponName}] Ammo: ${me.ammo}/${me.maxAmmo}`;
                 } else if (me.class === 'mage') {
                     extraStat.innerText = `| Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
                 } else {
@@ -255,7 +264,6 @@
             socket.emit('shoot', { x: e.clientX - rect.left, y: e.clientY - rect.top });
         });
 
-        // Pure rendering loop running strictly at the player's system frame rate (FPS)
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -278,7 +286,15 @@
                     ctx.font = `${z.size * 1.2}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('🧟', z.x + z.size / 2, z.y + z.size / 2);
+                    let emoji = '🧟';
+                    if (z.type === 'boss') emoji = '👹';
+                    ctx.fillText(emoji, z.x + z.size / 2, z.y + z.size / 2);
+
+                    // Zombie Health Bar
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(z.x, z.y - 8, z.size, 3);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(z.x, z.y - 8, z.size * Math.max(0, (z.hp / z.maxHp)), 3);
                 });
 
                 for (let id in gameState.players) {
@@ -292,7 +308,7 @@
                         ctx.fillStyle = '#ff0000';
                         ctx.fillRect(p.x, p.y - 10, p.size, 4);
                         ctx.fillStyle = '#00ff00';
-                        ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
+                        ctx.fillRect(p.x, p.y - 10, p.size * Math.max(0, (p.hp / p.maxHp)), 4);
                     }
                 }
             }
