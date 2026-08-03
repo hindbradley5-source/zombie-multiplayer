@@ -203,7 +203,37 @@
             hud.classList.remove('hidden');
         });
 
-        socket.on('stateUpdate', (state) => { gameState = state; });
+        // HUD and state updates happen here cleanly instead of inside the render frame loop
+        socket.on('stateUpdate', (state) => {
+            gameState = state;
+
+            document.getElementById('wave-display').innerText = gameState.wave;
+            let me = gameState.players[socket.id];
+            if (me) {
+                document.getElementById('money-display').innerText = me.money;
+                document.getElementById('hp-display').innerText = Math.max(0, me.hp);
+
+                if (me.hp <= 0) {
+                    deathScreen.classList.remove('hidden');
+                } else {
+                    deathScreen.classList.add('hidden');
+                }
+
+                if (me.class === 'marksman') {
+                    extraStat.innerText = me.reloading ? '| Auto-Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo}`;
+                } else if (me.class === 'mage') {
+                    extraStat.innerText = `| Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
+                } else {
+                    extraStat.innerText = '| Melee (Infinite)';
+                }
+            }
+
+            if (!gameState.waveActive) {
+                shop.classList.remove('hidden');
+            } else {
+                shop.classList.add('hidden');
+            }
+        });
 
         const keys = {};
         window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
@@ -225,6 +255,7 @@
             socket.emit('shoot', { x: e.clientX - rect.left, y: e.clientY - rect.top });
         });
 
+        // Pure rendering loop running strictly at the player's system frame rate (FPS)
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -263,33 +294,6 @@
                         ctx.fillStyle = '#00ff00';
                         ctx.fillRect(p.x, p.y - 10, p.size * (p.hp / p.maxHp), 4);
                     }
-                }
-
-                document.getElementById('wave-display').innerText = gameState.wave;
-                let me = gameState.players[socket.id];
-                if (me) {
-                    document.getElementById('money-display').innerText = me.money;
-                    document.getElementById('hp-display').innerText = Math.max(0, me.hp);
-
-                    if (me.hp <= 0) {
-                        deathScreen.classList.remove('hidden');
-                    } else {
-                        deathScreen.classList.add('hidden');
-                    }
-
-                    if (me.class === 'marksman') {
-                        extraStat.innerText = me.reloading ? '| Auto-Reloading...' : `| Ammo: ${me.ammo}/${me.maxAmmo}`;
-                    } else if (me.class === 'mage') {
-                        extraStat.innerText = `| Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
-                    } else {
-                        extraStat.innerText = '| Melee (Infinite)';
-                    }
-                }
-
-                if (!gameState.waveActive) {
-                    shop.classList.remove('hidden');
-                } else {
-                    shop.classList.add('hidden');
                 }
             }
 
