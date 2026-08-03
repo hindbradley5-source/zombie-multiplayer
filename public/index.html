@@ -86,7 +86,7 @@
             font-size: 11px;
             margin: 2px;
             display: block;
-            width: 160px;
+            width: 180px;
         }
     </style>
 </head>
@@ -109,6 +109,10 @@
             <button onclick="buyItem('speed')">Buy Speed ($75)</button>
             <button onclick="buyItem('shotgun')" style="background: #e67e22;">Shotgun (Marksman) ($150)</button>
             <button onclick="buyItem('minigun')" style="background: #c0392b;">Minigun (Marksman) ($250)</button>
+            <button onclick="buyItem('fireStaff')" style="background: #8e44ad;">Fire Staff (Mage) ($160)</button>
+            <button onclick="buyItem('lightning')" style="background: #2980b9;">Lightning (Mage) ($260)</button>
+            <button onclick="buyItem('fireAx')" style="background: #d35400;">Fire Axe (Melee) ($130)</button>
+            <button onclick="buyItem('katana')" style="background: #16a085;">Laser Katana (Melee) ($240)</button>
         </div>
 
         <!-- Canvas -->
@@ -227,13 +231,13 @@
                     deathScreen.classList.add('hidden');
                 }
 
+                let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
                 if (me.class === 'marksman') {
-                    let weaponName = me.weaponType ? me.weaponType.toUpperCase() : 'PISTOL';
                     extraStat.innerText = me.reloading ? `| [${weaponName}] Auto-Reloading...` : `| [${weaponName}] Ammo: ${me.ammo}/${me.maxAmmo}`;
                 } else if (me.class === 'mage') {
-                    extraStat.innerText = `| Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
+                    extraStat.innerText = `| [${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana}`;
                 } else {
-                    extraStat.innerText = '| Melee (Infinite)';
+                    extraStat.innerText = `| [${weaponName}] Melee`;
                 }
             }
 
@@ -290,7 +294,6 @@
                     if (z.type === 'boss') emoji = '👹';
                     ctx.fillText(emoji, z.x + z.size / 2, z.y + z.size / 2);
 
-                    // Zombie Health Bar
                     ctx.fillStyle = '#ff0000';
                     ctx.fillRect(z.x, z.y - 8, z.size, 3);
                     ctx.fillStyle = '#00ff00';
