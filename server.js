@@ -222,7 +222,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// Locked to 30 FPS to eliminate lag spikes and bugs
 setInterval(() => {
     for (let code in rooms) {
         let room = rooms[code];
