@@ -138,7 +138,6 @@ io.on('connection', (socket) => {
 
         if (p.class === 'marksman') {
             if (p.ammo <= 0) {
-                // Auto-trigger reload if empty
                 p.reloading = true;
                 setTimeout(() => {
                     if (room.players[socket.id]) {
@@ -179,11 +178,25 @@ io.on('connection', (socket) => {
         });
     });
 
+    socket.on('respawn', () => {
+        const room = rooms[socket.roomCode];
+        if (!room) return;
+        let p = room.players[socket.id];
+        if (p && p.hp <= 0) {
+            p.hp = p.maxHp;
+            p.x = 400;
+            p.y = 300;
+            if (p.class === 'marksman') p.ammo = p.maxAmmo;
+            if (p.class === 'mage') p.mana = p.maxMana;
+            p.reloading = false;
+        }
+    });
+
     socket.on('buy', (item) => {
         const room = rooms[socket.roomCode];
         if (!room || room.waveActive) return;
         let p = room.players[socket.id];
-        if (!p) return;
+        if (!p || p.hp <= 0) return;
 
         if (item === 'health' && p.money >= 50) {
             p.money -= 50;
@@ -209,6 +222,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// Locked to 30 FPS to eliminate lag spikes and bugs
 setInterval(() => {
     for (let code in rooms) {
         let room = rooms[code];
@@ -346,7 +360,7 @@ setInterval(() => {
             waveActive: room.waveActive
         });
     }
-}, 1000 / 60);
+}, 1000 / 30);
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
