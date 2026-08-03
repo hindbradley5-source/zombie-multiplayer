@@ -71,6 +71,19 @@
             font-weight: bold;
             text-shadow: 1px 1px 2px #000;
         }
+        #in-game-menu-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 5;
+            padding: 5px 12px;
+            font-size: 12px;
+            background: #7f8c8d;
+            pointer-events: auto;
+        }
+        #in-game-menu-btn:hover {
+            background: #95a5a6;
+        }
         #shop {
             position: absolute;
             bottom: 10px;
@@ -99,6 +112,9 @@
             HP: <span id="hp-display">100</span> 
             <span id="extra-stat" style="color: #f1c40f; margin-left: 10px;"></span>
         </div>
+
+        <!-- In-game Main Menu Button (Always available during gameplay) -->
+        <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
 
         <!-- Shop -->
         <div id="shop" class="hidden">
@@ -167,6 +183,7 @@
         const deathScreen = document.getElementById('death-screen');
         const hud = document.getElementById('hud');
         const shop = document.getElementById('shop');
+        const inGameMenuBtn = document.getElementById('in-game-menu-btn');
         const partyCodeDisplay = document.getElementById('party-code-display');
         const playerList = document.getElementById('player-list');
         const errorMsg = document.getElementById('error-msg');
@@ -214,6 +231,7 @@
         socket.on('gameStarted', () => {
             lobbyScreen.classList.add('hidden');
             hud.classList.remove('hidden');
+            inGameMenuBtn.classList.remove('hidden');
         });
 
         socket.on('stateUpdate', (state) => {
@@ -227,8 +245,10 @@
 
                 if (me.hp <= 0) {
                     deathScreen.classList.remove('hidden');
+                    inGameMenuBtn.classList.add('hidden');
                 } else {
                     deathScreen.classList.add('hidden');
+                    inGameMenuBtn.classList.remove('hidden');
                 }
 
                 let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
