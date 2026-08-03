@@ -8,8 +8,8 @@ app.use(express.static('public'));
 const rooms = {};
 
 const classData = {
-    mage: { color: '#9b59b6', speed: 5, maxHp: 100, bulletSpeed: 8, bulletSize: 18, damage: 85, mana: 100, maxMana: 100, manaCost: 15 },
-    melee: { color: '#95a5a6', speed: 6, maxHp: 150, bulletSpeed: 15, bulletSize: 5, damage: 100, range: 10 },
+    mage: { color: '#9b59b6', speed: 5.5, maxHp: 120, bulletSpeed: 9, bulletSize: 18, damage: 110, mana: 120, maxMana: 120, manaCost: 12, weaponType: 'orb' },
+    melee: { color: '#95a5a6', speed: 7, maxHp: 220, bulletSpeed: 18, bulletSize: 12, damage: 160, weaponType: 'dagger' },
     marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 30, ammo: 15, maxAmmo: 15, weaponType: 'pistol', reloading: false }
 };
 
@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
             room.players[socket.id].manaCost = stats.manaCost !== undefined ? stats.manaCost : 0;
             room.players[socket.id].ammo = stats.ammo !== undefined ? stats.ammo : 0;
             room.players[socket.id].maxAmmo = stats.maxAmmo !== undefined ? stats.maxAmmo : 0;
-            room.players[socket.id].weaponType = 'pistol';
+            room.players[socket.id].weaponType = stats.weaponType || 'pistol';
             room.players[socket.id].reloading = false;
         }
 
@@ -187,8 +187,53 @@ io.on('connection', (socket) => {
                     life: 60
                 });
             }
+        } else if (p.class === 'melee' && p.weaponType === 'fireAx') {
+            for (let i = -1; i <= 1; i++) {
+                const angle = baseAngle + (i * 0.2);
+                room.bullets.push({
+                    x: p.x + p.size/2,
+                    y: p.y + p.size/2,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle),
+                    speed: p.bulletSpeed,
+                    size: p.bulletSize,
+                    damage: p.damage,
+                    owner: socket.id,
+                    life: 8
+                });
+            }
+        } else if (p.class === 'melee' && p.weaponType === 'katana') {
+            for (let i = -2; i <= 2; i++) {
+                const angle = baseAngle + (i * 0.12);
+                room.bullets.push({
+                    x: p.x + p.size/2,
+                    y: p.y + p.size/2,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle),
+                    speed: p.bulletSpeed,
+                    size: p.bulletSize,
+                    damage: p.damage,
+                    owner: socket.id,
+                    life: 10
+                });
+            }
+        } else if (p.class === 'mage' && p.weaponType === 'lightning') {
+            for (let i = -1; i <= 1; i++) {
+                const angle = baseAngle + (i * 0.1);
+                room.bullets.push({
+                    x: p.x + p.size/2,
+                    y: p.y + p.size/2,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle),
+                    speed: p.bulletSpeed * 1.3,
+                    size: p.bulletSize * 0.7,
+                    damage: p.damage * 0.75,
+                    owner: socket.id,
+                    life: 50
+                });
+            }
         } else {
-            const lifespan = p.class === 'melee' ? 5 : 60; 
+            const lifespan = p.class === 'melee' ? 10 : 60; 
             room.bullets.push({
                 x: p.x + p.size/2,
                 y: p.y + p.size/2,
@@ -236,7 +281,9 @@ io.on('connection', (socket) => {
         } else if (item === 'speed' && p.money >= 75) {
             p.money -= 75;
             p.speed += 1;
-        } else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun') {
+        } 
+        // Marksman Weapons
+        else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun') {
             p.money -= 150;
             p.weaponType = 'shotgun';
             p.maxAmmo = 8;
@@ -248,6 +295,33 @@ io.on('connection', (socket) => {
             p.maxAmmo = 50;
             p.ammo = 50;
             p.damage = 15;
+        }
+        // Mage Weapons
+        else if (item === 'fireStaff' && p.class === 'mage' && p.money >= 160 && p.weaponType !== 'fireStaff' && p.weaponType !== 'lightning') {
+            p.money -= 160;
+            p.weaponType = 'fireStaff';
+            p.bulletSize = 26;
+            p.damage = 180;
+            p.manaCost = 22;
+        } else if (item === 'lightning' && p.class === 'mage' && p.money >= 260 && p.weaponType !== 'lightning') {
+            p.money -= 260;
+            p.weaponType = 'lightning';
+            p.bulletSize = 10;
+            p.damage = 140;
+            p.manaCost = 18;
+        }
+        // Melee Weapons
+        else if (item === 'fireAx' && p.class === 'melee' && p.money >= 130 && p.weaponType !== 'fireAx' && p.weaponType !== 'katana') {
+            p.money -= 130;
+            p.weaponType = 'fireAx';
+            p.bulletSize = 16;
+            p.damage = 240;
+        } else if (item === 'katana' && p.class === 'melee' && p.money >= 240 && p.weaponType !== 'katana') {
+            p.money -= 240;
+            p.weaponType = 'katana';
+            p.bulletSize = 14;
+            p.damage = 320;
+            p.speed += 1; // Extra mobility boost for Katana
         }
     });
 
@@ -271,7 +345,7 @@ setInterval(() => {
         for (let id in room.players) {
             let p = room.players[id];
             if (p.class === 'mage' && p.mana < p.maxMana && p.hp > 0) {
-                p.mana = Math.min(p.maxMana, p.mana + 0.5); // Faster mana regen buff
+                p.mana = Math.min(p.maxMana, p.mana + 0.6); 
             }
         }
 
@@ -279,7 +353,6 @@ setInterval(() => {
             let zType = 'normal';
             let roll = Math.random(); 
             
-            // Boss zombie every 10 waves
             if (room.wave % 10 === 0 && !room.bossSpawnedThisWave) {
                 zType = 'boss';
                 room.bossSpawnedThisWave = true;
@@ -386,7 +459,6 @@ setInterval(() => {
         if (room.waveActive && room.zombiesToSpawn <= 0 && room.zombies.length === 0) {
             room.waveActive = false;
             
-            // Round completion money bonus that scales up every wave
             let roundBonus = 60 + (room.wave * 35);
             for (let id in room.players) {
                 if (room.players[id].hp > 0) {
@@ -404,7 +476,7 @@ setInterval(() => {
                 if (rooms[code] && rooms[code].gameStarted) {
                     rooms[code].wave++;
                     rooms[code].waveActive = true;
-                    rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 18); // Harder scaling each wave
+                    rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 18);
                     rooms[code].bossSpawnedThisWave = false;
                 }
             }, 5000); 
