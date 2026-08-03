@@ -2,53 +2,45 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Zombie Multiplayer Game</title>
+    <title>Zombie Multiplayer Survival</title>
     <style>
-        body {
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             background-color: #111;
             color: #fff;
             font-family: Arial, sans-serif;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             overflow: hidden;
         }
         #game-container {
             position: relative;
-            width: 650px;
-            height: 650px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            width: 100vw;
+            height: 100vh;
         }
         canvas {
-            background-color: #1a1a1a;
-            border: 6px solid #f1c40f;
-            border-radius: 50%;
             display: block;
-            box-shadow: 0 0 30px rgba(241, 196, 15, 0.4);
+            background-color: #1a1a1a;
         }
         .screen {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.85);
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.88);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 10;
-            border-radius: 10px;
         }
         .hidden {
             display: none !important;
         }
         input, button {
-            padding: 10px 20px;
+            padding: 12px 24px;
             margin: 10px;
             font-size: 16px;
             border-radius: 5px;
@@ -73,47 +65,58 @@
             left: 20px;
             z-index: 5;
             pointer-events: none;
-            font-size: 15px;
+            font-size: 18px;
             font-weight: bold;
-            text-shadow: 1px 1px 2px #000;
+            text-shadow: 2px 2px 4px #000;
         }
-        #in-game-menu-btn {
+        #top-right-controls {
             position: absolute;
             top: 15px;
             right: 20px;
             z-index: 5;
-            padding: 5px 12px;
-            font-size: 12px;
+            display: flex;
+            gap: 10px;
+        }
+        #in-game-menu-btn {
+            padding: 8px 16px;
+            font-size: 14px;
             background: #7f8c8d;
-            pointer-events: auto;
         }
         #in-game-menu-btn:hover {
             background: #95a5a6;
         }
+        /* Full Screen Shop Overlay */
         #shop {
             position: absolute;
-            bottom: 15px;
-            right: 20px;
-            background: rgba(0,0,0,0.9);
-            padding: 10px;
-            border: 1px solid #444;
-            border-radius: 8px;
-            z-index: 5;
-            max-height: 520px;
-            overflow-y: auto;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 5, 10, 0.92);
+            z-index: 8;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-        #shop button {
-            padding: 5px 10px;
-            font-size: 11px;
-            margin: 2px;
-            display: block;
-            width: 190px;
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            max-width: 900px;
+            margin-top: 20px;
+        }
+        .shop-grid button {
+            padding: 15px;
+            font-size: 14px;
+            width: 260px;
+            margin: 0;
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <!-- HUD -->
+        <!-- HUD Top Left -->
         <div id="hud" class="hidden">
             Wave: <span id="wave-display">1</span> | 
             Money: $<span id="money-display">0</span> | 
@@ -121,27 +124,32 @@
             <span id="extra-stat" style="color: #f1c40f; margin-left: 10px;"></span>
         </div>
 
-        <!-- In-game Main Menu Button -->
-        <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
+        <!-- Top Right Controls -->
+        <div id="top-right-controls">
+            <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
+        </div>
 
-        <!-- Shop -->
+        <!-- Full-Screen Shop Overlay -->
         <div id="shop" class="hidden">
-            <h4 style="margin: 0 0 5px 0; text-align: center;">Shop (Between Waves)</h4>
-            <button onclick="buyItem('health')">Heal Full ($50)</button>
-            <button onclick="buyItem('maxHealth')">+10% Max HP ($120)</button>
-            <button onclick="buyItem('damage')">+1% Damage ($100)</button>
-            <button onclick="buyItem('speed')">+1% Speed ($75)</button>
-            <button onclick="buyItem('shotgun')" style="background: #e67e22;">Shotgun (Marksman) ($150)</button>
-            <button onclick="buyItem('minigun')" style="background: #c0392b;">Minigun (Marksman) ($250)</button>
-            <button onclick="buyItem('fireStaff')" style="background: #8e44ad;">Fire Staff (Mage) ($160)</button>
-            <button onclick="buyItem('lightning')" style="background: #2980b9;">Lightning (Mage) ($260)</button>
-            <button onclick="buyItem('fireAx')" style="background: #d35400;">Fire Axe (Melee) ($130)</button>
-            <button onclick="buyItem('katana')" style="background: #16a085;">Laser Katana (Melee) ($240)</button>
-            <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold;">⚡ Mega Weapon ($100,000)</button>
+            <h2 style="color: #f1c40f; margin-bottom: 5px;">🛒 ARMORY & SHOP</h2>
+            <p style="font-size: 18px; margin-bottom: 15px;">Next wave starts in: <span id="shop-timer" style="color: #e74c3c; font-weight: bold;">30</span>s</p>
+            <div class="shop-grid">
+                <button onclick="buyItem('health')">Heal Full ($50)</button>
+                <button onclick="buyItem('maxHealth')">+10% Max HP ($120)</button>
+                <button onclick="buyItem('damage')">+1% Damage ($100)</button>
+                <button onclick="buyItem('speed')">+1% Speed ($75)</button>
+                <button onclick="buyItem('shotgun')" style="background: #e67e22;">Shotgun (Marksman) ($150)</button>
+                <button onclick="buyItem('minigun')" style="background: #c0392b;">Minigun (Marksman) ($250)</button>
+                <button onclick="buyItem('fireStaff')" style="background: #8e44ad;">Fire Staff (Mage) ($160)</button>
+                <button onclick="buyItem('lightning')" style="background: #2980b9;">Lightning (Mage) ($260)</button>
+                <button onclick="buyItem('fireAx')" style="background: #d35400;">Fire Axe (Melee) ($130)</button>
+                <button onclick="buyItem('katana')" style="background: #16a085;">Laser Katana (Melee) ($240)</button>
+                <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold; grid-column: span 2;">⚡ Mega Weapon ($100,000)</button>
+            </div>
         </div>
 
         <!-- Canvas -->
-        <canvas id="gameCanvas" width="1000" height="1000"></canvas>
+        <canvas id="gameCanvas"></canvas>
 
         <!-- Main Menu Screen -->
         <div id="main-menu" class="screen">
@@ -158,7 +166,7 @@
         <div id="lobby-screen" class="screen hidden">
             <h2 id="party-code-display">Party Code: </h2>
             <p>Give this code to your friend!</p>
-            <div style="background: #222; padding: 15px; border-radius: 5px; width: 300px; margin-bottom: 15px;">
+            <div style="background: #222; padding: 20px; border-radius: 5px; width: 320px; margin-bottom: 20px;">
                 <h4>Players in Party:</h4>
                 <ul id="player-list" style="list-style: none; padding: 0;"></ul>
             </div>
@@ -176,10 +184,10 @@
 
         <!-- Death Screen -->
         <div id="death-screen" class="screen hidden">
-            <h2 style="color: #e74c3c; font-size: 36px; margin-bottom: 5px;">YOU DIED</h2>
-            <p style="color: #bbb; margin-bottom: 20px;">The zombies overwhelmed you.</p>
-            <button onclick="respawnPlayer()" style="background: #e67e22; font-size: 18px;">Respawn</button>
-            <button onclick="goToMainMenu()" style="background: #7f8c8d; font-size: 16px; margin-top: 10px;">Main Menu</button>
+            <h2 style="color: #e74c3c; font-size: 48px; margin-bottom: 5px;">YOU DIED</h2>
+            <p style="color: #bbb; font-size: 20px; margin-bottom: 20px;">The zombies overwhelmed you.</p>
+            <button onclick="respawnPlayer()" style="background: #e67e22; font-size: 20px;">Respawn</button>
+            <button onclick="goToMainMenu()" style="background: #7f8c8d; font-size: 16px; margin-top: 15px;">Main Menu</button>
         </div>
     </div>
 
@@ -202,7 +210,14 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], wave: 1, waveActive: false };
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], wave: 1, waveActive: false, shopTimer: 30 };
 
         function createParty() { socket.emit('createParty'); }
         function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
@@ -247,6 +262,7 @@
             gameState = state;
 
             document.getElementById('wave-display').innerText = gameState.wave;
+            document.getElementById('shop-timer').innerText = gameState.shopTimer;
             let me = gameState.players[socket.id];
             if (me) {
                 document.getElementById('money-display').innerText = me.money;
@@ -312,12 +328,15 @@
 
         canvas.addEventListener('click', (e) => {
             if (!lobbyScreen.classList.contains('hidden')) return;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
+            const me = gameState.players[socket.id];
+            if (!me) return;
+
+            const camX = me.x - canvas.width / 2;
+            const camY = me.y - canvas.height / 2;
+
             socket.emit('shoot', { 
-                x: (e.clientX - rect.left) * scaleX, 
-                y: (e.clientY - rect.top) * scaleY 
+                x: e.clientX + camX, 
+                y: e.clientY + camY 
             });
         });
 
@@ -325,35 +344,46 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (lobbyScreen.classList.contains('hidden')) {
-                // Dynamic ambient background color based on wave
+                const me = gameState.players[socket.id];
+                const camX = me ? me.x - canvas.width / 2 : 0;
+                const camY = me ? me.y - canvas.height / 2 : 0;
+
+                ctx.save();
+                ctx.translate(-camX, -camY);
+
                 let tintAlpha = Math.min(0.4, (gameState.wave % 5) * 0.08);
                 ctx.fillStyle = `rgba(10, 0, 20, ${tintAlpha})`;
-                ctx.fillRect(0, 0, 1000, 1000);
+                ctx.fillRect(0, 0, 2000, 2000);
 
                 ctx.strokeStyle = '#252525';
                 ctx.lineWidth = 2;
-                for (let i = 0; i <= 1000; i += 100) {
+                for (let i = 0; i <= 2000; i += 100) {
                     ctx.beginPath();
-                    ctx.moveTo(i, 0); ctx.lineTo(i, 1000);
+                    ctx.moveTo(i, 0); ctx.lineTo(i, 2000);
                     ctx.stroke();
                     ctx.beginPath();
-                    ctx.moveTo(0, i); ctx.lineTo(1000, i);
+                    ctx.moveTo(0, i); ctx.lineTo(2000, i);
                     ctx.stroke();
                 }
 
-                // Draw barrels
+                // Arena Boundary Circle
+                ctx.strokeStyle = '#f1c40f';
+                ctx.lineWidth = 8;
+                ctx.beginPath();
+                ctx.arc(1000, 1000, 950, 0, Math.PI * 2);
+                ctx.stroke();
+
                 if (gameState.barrels) {
                     gameState.barrels.forEach(barrel => {
-                        ctx.font = '26px Arial';
+                        ctx.font = '32px Arial';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText('🛢️', barrel.x + barrel.size/2, barrel.y + barrel.size/2);
                     });
                 }
 
-                // Draw pickups & powerups
                 gameState.pickups.forEach(p => {
-                    ctx.font = '26px Arial';
+                    ctx.font = '32px Arial';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     let icon = '❤️';
@@ -378,9 +408,9 @@
                     ctx.fillText(emoji, z.x + z.size / 2, z.y + z.size / 2);
 
                     ctx.fillStyle = '#ff0000';
-                    ctx.fillRect(z.x, z.y - 10, z.size, 4);
+                    ctx.fillRect(z.x, z.y - 12, z.size, 5);
                     ctx.fillStyle = '#00ff00';
-                    ctx.fillRect(z.x, z.y - 10, z.size * Math.max(0, (z.hp / z.maxHp)), 4);
+                    ctx.fillRect(z.x, z.y - 12, z.size * Math.max(0, (z.hp / z.maxHp)), 5);
                 });
 
                 for (let id in gameState.players) {
@@ -400,11 +430,13 @@
                         ctx.fillText('🤠', p.x + p.size / 2, p.y + p.size / 2);
 
                         ctx.fillStyle = '#ff0000';
-                        ctx.fillRect(p.x, p.y - 12, p.size, 4);
+                        ctx.fillRect(p.x, p.y - 15, p.size, 5);
                         ctx.fillStyle = '#00ff00';
-                        ctx.fillRect(p.x, p.y - 12, p.size * Math.max(0, (p.hp / p.maxHp)), 4);
+                        ctx.fillRect(p.x, p.y - 15, p.size * Math.max(0, (p.hp / p.maxHp)), 5);
                     }
                 }
+
+                ctx.restore();
             }
 
             requestAnimationFrame(draw);
