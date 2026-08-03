@@ -8,9 +8,9 @@ app.use(express.static('public'));
 const rooms = {};
 
 const classData = {
-    mage: { color: '#9b59b6', speed: 4, maxHp: 80, bulletSpeed: 6, bulletSize: 15, damage: 50, mana: 100, maxMana: 100, manaCost: 25 },
+    mage: { color: '#9b59b6', speed: 5, maxHp: 100, bulletSpeed: 8, bulletSize: 18, damage: 85, mana: 100, maxMana: 100, manaCost: 15 },
     melee: { color: '#95a5a6', speed: 6, maxHp: 150, bulletSpeed: 15, bulletSize: 5, damage: 100, range: 10 },
-    marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 25, ammo: 12, maxAmmo: 12, reloading: false }
+    marksman: { color: '#f1c40f', speed: 5, maxHp: 100, bulletSpeed: 20, bulletSize: 4, damage: 30, ammo: 15, maxAmmo: 15, weaponType: 'pistol', reloading: false }
 };
 
 function generatePartyCode() {
@@ -35,7 +35,8 @@ io.on('connection', (socket) => {
             wave: 1,
             zombiesToSpawn: 15,
             waveActive: false,
-            gameStarted: false
+            gameStarted: false,
+            bossSpawnedThisWave: false
         };
         socket.roomCode = code;
         socket.join(code);
@@ -47,6 +48,7 @@ io.on('connection', (socket) => {
             hp: stats.maxHp,
             money: 0,
             class: 'marksman',
+            weaponType: 'pistol',
             ...stats 
         };
 
@@ -69,6 +71,7 @@ io.on('connection', (socket) => {
                 hp: stats.maxHp,
                 money: 0,
                 class: 'marksman',
+                weaponType: 'pistol',
                 ...stats 
             };
 
@@ -98,6 +101,7 @@ io.on('connection', (socket) => {
             room.players[socket.id].manaCost = stats.manaCost !== undefined ? stats.manaCost : 0;
             room.players[socket.id].ammo = stats.ammo !== undefined ? stats.ammo : 0;
             room.players[socket.id].maxAmmo = stats.maxAmmo !== undefined ? stats.maxAmmo : 0;
+            room.players[socket.id].weaponType = 'pistol';
             room.players[socket.id].reloading = false;
         }
 
@@ -110,7 +114,7 @@ io.on('connection', (socket) => {
 
         room.gameStarted = true;
         room.waveActive = true;
-        room.zombiesToSpawn = 15 + (room.wave * 10);
+        room.zombiesToSpawn = 15 + (room.wave * 15);
 
         io.to(socket.roomCode).emit('gameStarted');
     });
@@ -136,7 +140,11 @@ io.on('connection', (socket) => {
         let p = room.players[socket.id];
         if (!p || p.hp <= 0 || p.reloading) return;
 
+        let reloadTime = 500;
         if (p.class === 'marksman') {
+            if (p.weaponType === 'shotgun') reloadTime = 900;
+            if (p.weaponType === 'minigun') reloadTime = 300;
+
             if (p.ammo <= 0) {
                 p.reloading = true;
                 setTimeout(() => {
@@ -144,7 +152,7 @@ io.on('connection', (socket) => {
                         room.players[socket.id].ammo = room.players[socket.id].maxAmmo;
                         room.players[socket.id].reloading = false;
                     }
-                }, 500);
+                }, reloadTime);
                 return;
             }
             p.ammo--;
@@ -155,27 +163,44 @@ io.on('connection', (socket) => {
                         room.players[socket.id].ammo = room.players[socket.id].maxAmmo;
                         room.players[socket.id].reloading = false;
                     }
-                }, 500);
+                }, reloadTime);
             }
         } else if (p.class === 'mage') {
             if (p.mana < p.manaCost) return;
             p.mana -= p.manaCost;
         }
 
-        const angle = Math.atan2(target.y - (p.y + p.size/2), target.x - (p.x + p.size/2));
-        const lifespan = p.class === 'melee' ? 5 : 60; 
+        const baseAngle = Math.atan2(target.y - (p.y + p.size/2), target.x - (p.x + p.size/2));
 
-        room.bullets.push({
-            x: p.x + p.size/2,
-            y: p.y + p.size/2,
-            dx: Math.cos(angle),
-            dy: Math.sin(angle),
-            speed: p.bulletSpeed,
-            size: p.bulletSize,
-            damage: p.damage,
-            owner: socket.id,
-            life: lifespan 
-        });
+        if (p.class === 'marksman' && p.weaponType === 'shotgun') {
+            for (let i = -1; i <= 1; i++) {
+                const angle = baseAngle + (i * 0.15);
+                room.bullets.push({
+                    x: p.x + p.size/2,
+                    y: p.y + p.size/2,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle),
+                    speed: p.bulletSpeed,
+                    size: p.bulletSize,
+                    damage: p.damage,
+                    owner: socket.id,
+                    life: 60
+                });
+            }
+        } else {
+            const lifespan = p.class === 'melee' ? 5 : 60; 
+            room.bullets.push({
+                x: p.x + p.size/2,
+                y: p.y + p.size/2,
+                dx: Math.cos(baseAngle),
+                dy: Math.sin(baseAngle),
+                speed: p.bulletSpeed,
+                size: p.bulletSize,
+                damage: p.damage,
+                owner: socket.id,
+                life: lifespan 
+            });
+        }
     });
 
     socket.on('respawn', () => {
@@ -201,12 +226,28 @@ io.on('connection', (socket) => {
         if (item === 'health' && p.money >= 50) {
             p.money -= 50;
             p.hp = p.maxHp;
+        } else if (item === 'maxHealth' && p.money >= 120) {
+            p.money -= 120;
+            p.maxHp += 30;
+            p.hp = p.maxHp;
         } else if (item === 'damage' && p.money >= 100) {
             p.money -= 100;
             p.damage += 15;
         } else if (item === 'speed' && p.money >= 75) {
             p.money -= 75;
             p.speed += 1;
+        } else if (item === 'shotgun' && p.class === 'marksman' && p.money >= 150 && p.weaponType !== 'shotgun' && p.weaponType !== 'minigun') {
+            p.money -= 150;
+            p.weaponType = 'shotgun';
+            p.maxAmmo = 8;
+            p.ammo = 8;
+            p.damage = 22;
+        } else if (item === 'minigun' && p.class === 'marksman' && p.money >= 250 && p.weaponType !== 'minigun') {
+            p.money -= 250;
+            p.weaponType = 'minigun';
+            p.maxAmmo = 50;
+            p.ammo = 50;
+            p.damage = 15;
         }
     });
 
@@ -230,7 +271,7 @@ setInterval(() => {
         for (let id in room.players) {
             let p = room.players[id];
             if (p.class === 'mage' && p.mana < p.maxMana && p.hp > 0) {
-                p.mana = Math.min(p.maxMana, p.mana + 0.35);
+                p.mana = Math.min(p.maxMana, p.mana + 0.5); // Faster mana regen buff
             }
         }
 
@@ -238,23 +279,31 @@ setInterval(() => {
             let zType = 'normal';
             let roll = Math.random(); 
             
-            if (room.wave >= 2 && roll < 0.30) {
+            // Boss zombie every 10 waves
+            if (room.wave % 10 === 0 && !room.bossSpawnedThisWave) {
+                zType = 'boss';
+                room.bossSpawnedThisWave = true;
+            } else if (room.wave >= 2 && roll < 0.30) {
                 zType = 'tank';
             } else if (room.wave >= 3 && roll > 0.60) {
                 zType = 'runner';
             }
 
-            let zHp = 30 + (room.wave * 10);
-            let zSpeed = 1.2 + (room.wave * 0.1);
+            let zHp = 35 + (room.wave * 12);
+            let zSpeed = 1.2 + (room.wave * 0.12);
             let zSize = 35;
 
-            if (zType === 'tank') {
-                zHp = zHp * 4;       
-                zSpeed = zSpeed * 0.4; 
-                zSize = 50;          
+            if (zType === 'boss') {
+                zHp = 600 + (room.wave * 150);
+                zSpeed = 0.9 + (room.wave * 0.02);
+                zSize = 85;
+            } else if (zType === 'tank') {
+                zHp = zHp * 5;       
+                zSpeed = zSpeed * 0.35; 
+                zSize = 55;          
             } else if (zType === 'runner') {
-                zHp = zHp * 0.5;     
-                zSpeed = zSpeed * 1.8; 
+                zHp = zHp * 0.6;     
+                zSpeed = zSpeed * 1.9; 
                 zSize = 25;          
             }
 
@@ -263,6 +312,7 @@ setInterval(() => {
                 y: Math.random() * 600,
                 size: zSize,
                 hp: zHp,
+                maxHp: zHp,
                 speed: zSpeed,
                 type: zType,
                 rewarded: false
@@ -287,7 +337,8 @@ setInterval(() => {
                 z.x += Math.cos(angle) * z.speed;
                 z.y += Math.sin(angle) * z.speed;
 
-                if (minDist < 35) closest.hp -= 1;
+                let hitDistance = z.type === 'boss' ? 60 : 35;
+                if (minDist < hitDistance) closest.hp -= (z.type === 'boss' ? 3 : 1);
             }
         });
 
@@ -309,7 +360,7 @@ setInterval(() => {
                     if (z.hp <= 0 && !z.rewarded) {
                         z.rewarded = true;
                         if (b.owner && room.players[b.owner]) {
-                            room.players[b.owner].money += 20;
+                            room.players[b.owner].money += (z.type === 'boss' ? 300 : 20);
                         }
                     }
                 }
@@ -335,6 +386,14 @@ setInterval(() => {
         if (room.waveActive && room.zombiesToSpawn <= 0 && room.zombies.length === 0) {
             room.waveActive = false;
             
+            // Round completion money bonus that scales up every wave
+            let roundBonus = 60 + (room.wave * 35);
+            for (let id in room.players) {
+                if (room.players[id].hp > 0) {
+                    room.players[id].money += roundBonus;
+                }
+            }
+
             room.pickups.push({
                 x: Math.random() * 700 + 50,
                 y: Math.random() * 500 + 50,
@@ -345,7 +404,8 @@ setInterval(() => {
                 if (rooms[code] && rooms[code].gameStarted) {
                     rooms[code].wave++;
                     rooms[code].waveActive = true;
-                    rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 10);
+                    rooms[code].zombiesToSpawn = 15 + (rooms[code].wave * 18); // Harder scaling each wave
+                    rooms[code].bossSpawnedThisWave = false;
                 }
             }, 5000); 
         }
