@@ -701,9 +701,10 @@ io.on('connection', (socket) => {
                             if (room.bloodSplatters.length > 80) room.bloodSplatters.shift();
 
                             const baseReward = (z.type === 'boss' ? 800 : 35) * (room.environmentalEvent === 'bloodMoon' ? 2.5 : 1);
+                            // 💸 Global shared cash for ALL players in the room!
                             for (let id in room.players) {
                                 const recipient = room.players[id];
-                                if (recipient.hp > 0) recipient.money += Math.round(baseReward * (recipient.moneyGainMultiplier || 1.0));
+                                if (recipient) recipient.money += Math.round(baseReward * (recipient.moneyGainMultiplier || 1.0));
                             }
                         }
                     }
@@ -1220,9 +1221,10 @@ setInterval(() => {
                             }
                         }
 
+                        // 💸 Global shared cash for EVERY player in party!
                         for (let id in room.players) {
                             const recipient = room.players[id];
-                            if (recipient.hp > 0) {
+                            if (recipient) {
                                 const mult = recipient.moneyGainMultiplier || 1.0;
                                 recipient.money += Math.round(baseReward * mult);
                             }
