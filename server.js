@@ -42,6 +42,7 @@ function makePlayer(stats, x, y) {
         size: 35,
         hp: stats.maxHp,
         money: 0,
+        moneyGainMultiplier: 1.0, // Base 1.0 multiplier (can be upgraded +1% at a time)
         class: 'marksman',
         baseClass: 'marksman',
         avatar: '🤠',
@@ -282,6 +283,8 @@ io.on('connection', (socket) => {
         else if (item === 'maxHealth' && p.money >= 120)   { p.money -= 120; p.maxHp += Math.round(base.maxHp * 0.10); p.hp = p.maxHp; }
         else if (item === 'damage'    && p.money >= 100)   { p.money -= 100; p.damage += Math.max(1, Math.round(base.damage * 0.01)); }
         else if (item === 'speed'     && p.money >= 75)    { p.money -= 75;  p.speed += Number((base.speed * 0.01).toFixed(2)); }
+        // NEW +1% Gold Gain Upgrade Logic ($100 per 1%)
+        else if (item === 'moneyGain' && p.money >= 100)   { p.money -= 100; p.moneyGainMultiplier = Number(((p.moneyGainMultiplier || 1.0) + 0.01).toFixed(2)); }
         else if (item === 'shotgun'   && p.class === 'marksman' && p.money >= 150  && !['shotgun','minigun','megaWeapon'].includes(p.weaponType))   { p.money -= 150;  p.weaponType = 'shotgun';  p.maxAmmo = 8;   p.ammo = 8;   p.damage = 22;  p.attackSpeed = 'Slow (0.9s)'; }
         else if (item === 'minigun'   && p.class === 'marksman' && p.money >= 250  && !['minigun','megaWeapon'].includes(p.weaponType))             { p.money -= 250;  p.weaponType = 'minigun';  p.maxAmmo = 200; p.ammo = 200; p.damage = 15;  p.bulletSize = base.bulletSize * 3; p.attackSpeed = 'Very Fast (0.2s)'; }
         else if (item === 'fireStaff' && p.class === 'mage'     && p.money >= 160  && !['fireStaff','lightning','megaWeapon'].includes(p.weaponType)) { p.money -= 160;  p.weaponType = 'fireStaff'; p.bulletSize = 26; p.damage = 180; p.manaCost = 22; p.attackSpeed = 'Slow (1.2s)'; }
@@ -308,14 +311,12 @@ setInterval(() => {
         const room = rooms[code];
         if (!room.gameStarted) continue;
 
-        // Mana regen + power-up timers
         for (let id in room.players) {
             const p = room.players[id];
             if (p.class === 'mage' && p.mana < p.maxMana && p.hp > 0) p.mana = Math.min(p.maxMana, p.mana + 0.6);
             if (p.powerUpTimer > 0) { p.powerUpTimer--; if (p.powerUpTimer === 0) p.powerUpType = null; }
         }
 
-        // Shop timer / wave start
         if (!room.waveActive) {
             room.shopTimer -= 1 / 30;
             if (room.shopTimer <= 0) {
@@ -328,7 +329,6 @@ setInterval(() => {
                 room.waveClearHandled = false;
             }
         } else {
-            // Zombie spawner
             if (room.zombiesToSpawn > 0 && Math.random() < 0.25) {
                 let zType = 'normal';
                 const roll = Math.random();
@@ -354,7 +354,6 @@ setInterval(() => {
             }
         }
 
-        // Zombie movement + player damage
         room.zombies.forEach(z => {
             let closest = null, minDist = Infinity;
             for (let id in room.players) {
@@ -390,7 +389,6 @@ setInterval(() => {
             }
         });
 
-        // Bullet movement + hit detection
         room.bullets.forEach(b => {
             b.x += b.dx * b.speed;
             b.y += b.dy * b.speed;
@@ -401,7 +399,6 @@ setInterval(() => {
                 return;
             }
 
-            // Barrel hits
             room.barrels.forEach(barrel => {
                 if (b.markedForDeletion) return;
                 if (b.x > barrel.x && b.x < barrel.x + barrel.size && b.y > barrel.y && b.y < barrel.y + barrel.size) {
@@ -417,20 +414,26 @@ setInterval(() => {
                 }
             });
 
-            // Zombie hits
             room.zombies.forEach(z => {
                 if (b.markedForDeletion) return;
                 if (b.x > z.x && b.x < z.x + z.size && b.y > z.y && b.y < z.y + z.size) {
                     z.hp -= b.damage;
                     b.markedForDeletion = true;
+
+                    // When Zombie is killed:
                     if (z.hp <= 0 && !z.rewarded) {
                         z.rewarded = true;
-                        const reward = z.type === 'boss' ? 800 : 35;
+                        const baseReward = z.type === 'boss' ? 800 : 35;
+                        
+                        // Give money to ALL active players in the game, scaled by their moneyGainMultiplier
                         for (let id in room.players) {
-                            if (room.players[id].hp > 0) room.players[id].money += reward;
+                            const recipient = room.players[id];
+                            if (recipient.hp > 0) {
+                                const mult = recipient.moneyGainMultiplier || 1.0;
+                                recipient.money += Math.round(baseReward * mult);
+                            }
                         }
 
-                        // REMOVED NUKE: Only drop Speed, Double Damage, or extra Health Pack drops
                         if (Math.random() < 0.20) {
                             const pTypes = ['speed', 'doubleDamage', 'health'];
                             const chosen = pTypes[Math.floor(Math.random() * pTypes.length)];
@@ -445,7 +448,6 @@ setInterval(() => {
             });
         });
 
-        // Explosion + speech bubble timers
         room.explosions.forEach(ex => ex.life--);
         room.explosions = room.explosions.filter(ex => ex.life > 0);
         room.speechBubbles.forEach(sb => { sb.y -= 0.4; sb.life--; });
@@ -455,7 +457,6 @@ setInterval(() => {
         room.zombies  = room.zombies.filter(z => z.hp > 0);
         room.barrels  = room.barrels.filter(barrel => !barrel.exploded);
 
-        // Pickup collection
         for (let id in room.players) {
             const p = room.players[id];
             if (p.hp <= 0) continue;
@@ -472,15 +473,20 @@ setInterval(() => {
             });
         }
 
-        // Wave clear check
         const spawnedSoFar = room.totalZombiesThisWave - room.zombiesToSpawn;
         if (room.waveActive && !room.waveClearHandled && room.zombiesToSpawn <= 0 && spawnedSoFar > 0 && room.zombies.length === 0) {
             room.waveActive = false;
             room.waveClearHandled = true;
             room.shopTimer = 30;
 
-            const roundBonus = 100 + (room.wave * 50);
-            for (let id in room.players) { if (room.players[id].hp > 0) room.players[id].money += roundBonus; }
+            const baseRoundBonus = 100 + (room.wave * 50);
+            for (let id in room.players) {
+                const recipient = room.players[id];
+                if (recipient.hp > 0) {
+                    const mult = recipient.moneyGainMultiplier || 1.0;
+                    recipient.money += Math.round(baseRoundBonus * mult);
+                }
+            }
 
             room.pickups.push({ x: ARENA_CENTER_X + (Math.random() * 200 - 100), y: ARENA_CENTER_Y + (Math.random() * 200 - 100), type: 'health' });
 
