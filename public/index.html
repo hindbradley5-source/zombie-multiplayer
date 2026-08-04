@@ -2,440 +2,1018 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zombie Survival Game</title>
+    <title>Zombie Multiplayer Survival</title>
     <style>
-        * {
-            box-sizing: border-box;
+        :root {
+            --bg-dark: #0b0b14;
+            --panel-bg: rgba(18, 18, 30, 0.75);
+            --panel-border: rgba(255, 255, 255, 0.12);
+            --accent-gold: #f1c40f;
+            --accent-red: #e74c3c;
+            --accent-blue: #3498db;
+            --accent-green: #2ecc71;
+            --accent-purple: #9b59b6;
+        }
+
+        body, html {
             margin: 0;
             padding: 0;
-        }
-        body {
-            background-color: #111;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-dark);
             color: #fff;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             overflow: hidden;
+            user-select: none;
         }
-        #gameCanvas {
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
             display: block;
-            background-color: #1b1b1b;
+            background-color: #12121c;
         }
-        #ui {
+
+        /* Screens & Modals */
+        .screen {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            font-size: 18px;
-            font-weight: bold;
-            pointer-events: none;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #1c1c30 0%, #07070f 100%);
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
         }
-        #game-over {
-            display: none;
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Low Health Vignette Overlay */
+        #vignette {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 40px;
-            border-radius: 12px;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            box-shadow: inset 0 0 100px rgba(231, 76, 60, 0);
+            transition: box-shadow 0.3s ease;
+            z-index: 4;
+        }
+
+        #vignette.critical {
+            animation: pulseVignette 1.2s infinite alternate;
+        }
+
+        @keyframes pulseVignette {
+            0% { box-shadow: inset 0 0 60px rgba(231, 76, 60, 0.4); }
+            100% { box-shadow: inset 0 0 140px rgba(231, 76, 60, 0.8); }
+        }
+
+        /* Buttons & Inputs */
+        input, button {
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+
+        input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--panel-border);
+            color: #fff;
             text-align: center;
-            border: 2px solid #ff4444;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            letter-spacing: 1px;
         }
-        #game-over h1 {
-            color: #ff4444;
-            font-size: 36px;
-            margin-bottom: 10px;
+
+        input:focus {
+            border-color: var(--accent-gold);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.3);
         }
-        #game-over p {
-            font-size: 20px;
+
+        button {
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+            color: white;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.5);
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Top HUD */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            z-index: 5;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(12px);
+            padding: 10px 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        .hud-card {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .hud-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8a8a9e;
+            font-weight: 700;
+        }
+
+        .hud-value {
+            font-size: 16px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .hud-divider {
+            width: 1px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Health Bar Gauge */
+        .hp-bar-outer {
+            width: 140px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-top: 3px;
+        }
+
+        .hp-bar-inner {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #e74c3c, #2ecc71);
+            transition: width 0.25s ease;
+            border-radius: 6px;
+        }
+
+        #top-right-controls {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            z-index: 5;
+        }
+
+        #in-game-menu-btn {
+            padding: 10px 18px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(10px);
+            box-shadow: none;
+        }
+        #in-game-menu-btn:hover {
+            background: rgba(231, 76, 60, 0.3);
+            border-color: var(--accent-red);
+        }
+
+        /* Shop Styling */
+        #shop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(8, 8, 16, 0.92);
+            backdrop-filter: blur(16px);
+            z-index: 8;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .shop-header {
+            text-align: center;
             margin-bottom: 20px;
         }
-        #retryBtn {
-            padding: 12px 30px;
-            font-size: 18px;
-            font-weight: bold;
-            color: white;
-            background: #ff4444;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
+
+        .shop-header h2 {
+            font-size: 32px;
+            margin: 0;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
         }
-        #retryBtn:hover {
-            background: #cc0000;
+
+        .shop-container {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+            max-width: 1000px;
+        }
+
+        .shop-categories {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .shop-section-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #8a8a9e;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .shop-grid button {
+            padding: 12px 16px;
+            font-size: 13px;
+            width: 250px;
+            margin: 0;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            box-shadow: none;
+        }
+
+        .shop-grid button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .price-badge {
+            background: rgba(241, 196, 15, 0.15);
+            color: var(--accent-gold);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        #tooltip-box {
+            width: 280px;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-gold);
+            border-radius: 14px;
+            padding: 20px;
+            box-sizing: border-box;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        #tooltip-box h4 {
+            margin: 0 0 10px 0;
+            color: var(--accent-gold);
+            font-size: 16px;
+        }
+
+        /* Menu Styling */
+        .menu-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            max-width: 440px;
+            width: 100%;
+        }
+
+        .menu-title {
+            font-size: 40px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #f1c40f, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            filter: drop-shadow(0 4px 12px rgba(231, 76, 60, 0.3));
+        }
+
+        .menu-subtitle {
+            color: #8a8a9e;
+            font-size: 14px;
+            margin-bottom: 25px;
+            font-weight: 500;
+        }
+
+        .avatar-grid {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 15px 0 25px 0;
+        }
+
+        .avatar-btn {
+            font-size: 26px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid transparent;
+            border-radius: 14px;
+            padding: 0;
+            cursor: pointer;
+            width: 54px;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .avatar-btn:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .avatar-btn.selected {
+            border-color: var(--accent-gold);
+            background: rgba(241, 196, 15, 0.15);
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+            transform: scale(1.1);
         }
     </style>
 </head>
 <body>
+    <div id="game-container">
+        <!-- Low HP Red Vignette Warning -->
+        <div id="vignette"></div>
 
-    <!-- HUD Overlay -->
-    <div id="ui">
-        <div id="healthDisplay">Health: 100</div>
-        <div id="waveDisplay">Wave: 1</div>
-        <div id="weaponDisplay">Weapon: Pistol (Rate: 400ms)</div>
-        <div id="upgradeDisplay">Upgrades: None</div>
+        <!-- HUD Top Left -->
+        <div id="hud" class="hidden">
+            <div class="hud-card">
+                <div class="hud-label">Wave <span id="wave-display" style="color:var(--accent-gold);">1</span></div>
+                <div class="hud-value" id="map-display" style="font-size: 13px; color: var(--accent-blue);">Apocalypse City</div>
+            </div>
+
+            <div class="hud-divider"></div>
+
+            <div class="hud-card">
+                <div class="hud-label">Health</div>
+                <div class="hp-bar-outer">
+                    <div id="hp-bar" class="hp-bar-inner"></div>
+                </div>
+                <div id="hp-display" style="font-size: 11px; margin-top:2px; color:#aaa; font-weight:700;">100/100</div>
+            </div>
+
+            <div class="hud-divider"></div>
+
+            <div class="hud-card">
+                <div class="hud-label">Funds</div>
+                <div class="hud-value" style="color: var(--accent-green);">$<span id="money-display">0</span></div>
+            </div>
+
+            <div class="hud-divider"></div>
+
+            <div class="hud-card">
+                <div class="hud-label">Combat Output</div>
+                <div class="hud-value" id="extra-stat" style="font-size: 13px; color: var(--accent-gold);">Ready</div>
+            </div>
+        </div>
+
+        <!-- Top Right Controls -->
+        <div id="top-right-controls">
+            <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
+        </div>
+
+        <!-- Shop Overlay -->
+        <div id="shop" class="hidden">
+            <div class="shop-header">
+                <h2>🛒 ARMORY & UPGRADES</h2>
+                <div style="font-size: 18px; font-weight: 800; color: var(--accent-green); margin-top: 6px;">
+                    Balance: $<span id="shop-money-display">0</span>
+                </div>
+                <p style="font-size: 15px; color: #8a8a9e; margin-top: 6px;">Next wave starting in: <span id="shop-timer" style="color: var(--accent-red); font-weight: 800;">30</span>s</p>
+                <button onclick="startWaveEarly()" style="background: linear-gradient(135deg, #2980b9, #1f618d); padding: 8px 20px; font-size: 13px; margin-top: 4px;">⚡ Start Wave Now</button>
+            </div>
+            
+            <div class="shop-container">
+                <div class="shop-categories">
+                    <div>
+                        <div class="shop-section-title">Field Upgrades</div>
+                        <div class="shop-grid">
+                            <button onclick="buyItem('health')" onmouseover="showTip('Health Pack', 'Instantly restores your HP back to maximum.', 'Instant HP', '50')" onmouseleave="clearTip()">Heal Full <span class="price-badge">$50</span></button>
+                            <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP <span class="price-badge">$120</span></button>
+                            <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently boosts damage output across all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage <span class="price-badge">$100</span></button>
+                            <button onclick="buyItem('speed')" onmouseover="showTip('Tactical Boots', 'Increases base player movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed <span class="price-badge">$75</span></button>
+                            <button onclick="buyItem('moneyGain')" onmouseover="showTip('Bounty Hunter', 'Increases all money gained from kills and wave clear bonuses by +1%.', '+1% Gold Gain', '100')" onmouseleave="clearTip()">+1% Gold Gain <span class="price-badge">$100</span></button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="shop-section-title">Weaponry & Arcana</div>
+                        <div class="shop-grid">
+                            <button onclick="buyItem('shotgun')" onmouseover="showTip('Shotgun', 'Fires a wide spread of 3 bullets per shot.', '22 Dmg | Slow (0.9s)', '150')" onmouseleave="clearTip()">Shotgun <span class="price-badge">$150</span></button>
+                            <button onclick="buyItem('minigun')" onmouseover="showTip('Minigun', 'Heavy continuous bullet stream with massive capacity.', '15 Dmg | Fast (0.2s)', '250')" onmouseleave="clearTip()">Minigun <span class="price-badge">$250</span></button>
+                            <button onclick="buyItem('fireStaff')" onmouseover="showTip('Fire Staff', 'Launches large explosive orb blasts that pierce target lines.', '180 Dmg | Slow (1.2s)', '160')" onmouseleave="clearTip()">Fire Staff <span class="price-badge">$160</span></button>
+                            <button onclick="buyItem('lightning')" onmouseover="showTip('Lightning Rod', 'Fires rapid electrical bolts with pinpoint precision.', '140 Dmg | Med (0.8s)', '260')" onmouseleave="clearTip()">Lightning Rod <span class="price-badge">$260</span></button>
+                            <button onclick="buyItem('fireAx')" onmouseover="showTip('Fire Axe', 'Devastating high-impact heavy close-quarters melee swing.', '240 Dmg | Med (0.6s)', '130')" onmouseleave="clearTip()">Fire Axe <span class="price-badge">$130</span></button>
+                            <button onclick="buyItem('katana')" onmouseover="showTip('Laser Katana', 'Lightning-fast blade slice paired with passive agility boost.', '320 Dmg | Fast (0.3s)', '240')" onmouseleave="clearTip()">Laser Katana <span class="price-badge">$240</span></button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="shop-section-title">Class Specs & Ultimate</div>
+                        <div class="shop-grid">
+                            <button onclick="buyItem('mage')" onmouseover="showTip('Switch to Mage', 'Re-spec into Mage (uses mana and powerful elemental staff spells).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Mage Class <span class="price-badge">$10k</span></button>
+                            <button onclick="buyItem('melee')" onmouseover="showTip('Switch to Melee', 'Re-spec into Melee bruiser (high HP & close quarters combat).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Melee Class <span class="price-badge">$10k</span></button>
+                            <button onclick="buyItem('marksman')" onmouseover="showTip('Switch to Marksman', 'Re-spec into Marksman (reloading mechanics & high speed firearms).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Marksman Class <span class="price-badge">$10k</span></button>
+                            <button onclick="buyItem('megaWeapon')" style="background: rgba(231,76,60,0.2); border-color: var(--accent-red);" onmouseover="showTip('MEGA WEAPON', 'Supreme devastation weapon with 360° blasts & dynamic forcefield.', '2.5x Multiplier', '100,000')" onmouseleave="clearTip()">⚡ MEGA WEAPON <span class="price-badge" style="background:var(--accent-red); color:#fff;">$100k</span></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tooltip-box">
+                    <h4>Armory Intel</h4>
+                    <p id="tip-desc" style="color: #8a8a9e; font-size: 13px; margin: 0 0 12px 0; line-height: 1.4;">Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.</p>
+                    <div id="tip-stats" style="font-size: 13px; color: var(--accent-gold); font-weight: 600;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Main Menu Screen -->
+        <div id="main-menu" class="screen">
+            <div class="menu-card">
+                <div class="menu-title">ZOMBIE ARENA</div>
+                <div class="menu-subtitle">Multiplayer Survival Wave Battle</div>
+                
+                <p style="font-size: 13px; color: #8a8a9e; margin-bottom: 8px; font-weight:700; text-transform:uppercase;">Select Avatar Symbol</p>
+                <div class="avatar-grid" id="avatar-selection">
+                    <div class="avatar-btn selected" onclick="selectAvatar('🤠', this)">🤠</div>
+                    <div class="avatar-btn" onclick="selectAvatar('🤖', this)">🤖</div>
+                    <div class="avatar-btn" onclick="selectAvatar('🧙‍♂️', this)">🧙‍♂️</div>
+                    <div class="avatar-btn" onclick="selectAvatar('🥷', this)">🥷</div>
+                    <div class="avatar-btn" onclick="selectAvatar('👽', this)">👽</div>
+                </div>
+
+                <button onclick="createParty()" style="width: 100%; margin: 6px 0;">Create Party</button>
+                <div style="margin: 15px 0; color: #555; font-size: 12px; font-weight: 700;">— OR JOIN PARTY —</div>
+                <input type="text" id="party-code-input" placeholder="Enter 4-Letter Code" maxlength="4" style="width: 80%; margin-bottom: 12px;">
+                <br>
+                <button onclick="joinParty()" style="width: 100%; margin: 6px 0; background: linear-gradient(135deg, #2980b9, #1f618d); box-shadow: 0 4px 15px rgba(41, 128, 185, 0.4);">Join Party</button>
+                <p id="error-msg" style="color: var(--accent-red); margin-top: 10px; font-size: 13px; font-weight: 600;"></p>
+            </div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="screen hidden">
+            <div class="menu-card" style="max-width: 480px;">
+                <h2 id="party-code-display" style="margin-top: 0; color: var(--accent-gold); font-size: 26px;">Party Code: </h2>
+                <p style="color: #8a8a9e; font-size: 14px; margin-bottom: 20px;">Share your party code and pick your class class!</p>
+                
+                <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 14px; margin-bottom: 20px; border: 1px solid var(--panel-border);">
+                    <h4 style="margin: 0 0 10px 0; color: #ddd; font-size: 13px; text-transform:uppercase;">Players in Lobby:</h4>
+                    <ul id="player-list" style="list-style: none; padding: 0; margin: 0; font-size: 14px; color: #bbb;"></ul>
+                </div>
+                
+                <h3 style="font-size: 14px; margin-bottom: 10px; text-transform: uppercase; color:#8a8a9e;">Choose Class:</h3>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button onclick="selectClass('mage')" style="background: var(--accent-purple); margin: 0; flex: 1;">Mage</button>
+                    <button onclick="selectClass('melee')" style="background: #7f8c8d; margin: 0; flex: 1;">Melee</button>
+                    <button onclick="selectClass('marksman')" style="background: var(--accent-gold); color: #000; margin: 0; flex: 1;">Marksman</button>
+                </div>
+                <br>
+                <button id="start-game-btn" onclick="startGame()" class="hidden" style="width: 100%; background: linear-gradient(135deg, #e67e22, #d35400); margin-top: 10px;">Start Game</button>
+                <br>
+                <button onclick="goToMainMenu()" style="width: 100%; background: rgba(255,255,255,0.08); box-shadow: none; font-size: 14px; margin-top: 5px;">Leave Lobby</button>
+            </div>
+        </div>
+
+        <!-- Single Player Death Screen (Waiting for next round) -->
+        <div id="death-screen" class="screen hidden">
+            <h2 style="color: var(--accent-red); font-size: 52px; margin-bottom: 5px; text-shadow: 0 0 30px rgba(231,76,60,0.6); font-weight: 900;">YOU DIED</h2>
+            <p style="color: #aaa; font-size: 18px; margin-bottom: 25px;">You will automatically respawn when the current round ends.</p>
+            <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); box-shadow: none; font-size: 15px;">Main Menu</button>
+        </div>
+
+        <!-- Game Over Screen (All Players Dead) -->
+        <div id="game-over-screen" class="screen hidden">
+            <h2 style="color: var(--accent-red); font-size: 56px; margin-bottom: 5px; text-shadow: 0 0 35px rgba(231,76,60,0.8); font-weight: 900;">GAME OVER</h2>
+            <p style="color: #bbb; font-size: 18px; margin-bottom: 30px;">All team members were eliminated!</p>
+            <div style="display: flex; gap: 15px;">
+                <button onclick="retryGame()" style="background: linear-gradient(135deg, #27ae60, #1e8449); font-size: 16px; padding: 12px 28px;">⚡ Retry Match</button>
+                <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); font-size: 16px; padding: 12px 28px;">Main Menu</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Game Over Screen -->
-    <div id="game-over">
-        <h1>YOU DIED</h1>
-        <p id="finalWave">You made it to Wave 1</p>
-        <button id="retryBtn" onclick="restartGame()">Retry</button>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
-
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+        const socket = io();
+
+        const mainMenu = document.getElementById('main-menu');
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const deathScreen = document.getElementById('death-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const hud = document.getElementById('hud');
+        const shop = document.getElementById('shop');
+        const inGameMenuBtn = document.getElementById('in-game-menu-btn');
+        const partyCodeDisplay = document.getElementById('party-code-display');
+        const playerList = document.getElementById('player-list');
+        const errorMsg = document.getElementById('error-msg');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const extraStat = document.getElementById('extra-stat');
+        const vignette = document.getElementById('vignette');
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Fit canvas to window
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        // Base Configuration Defaults
-        const BASE_PISTOL_FIRERATE = 400; // ms between shots
-        const MINIGUN_FIRERATE = 80;
-
-        // Game State Variables
-        let isGameOver = false;
-        let currentWave = 1;
-        let score = 0;
-        let lastShotTime = 0;
-
-        // Dynamic Entity Containers
-        let zombies = [];
-        let drops = [];
-        let barrels = [];
-        let projectiles = [];
-
-        // Input Tracking
-        const keys = {};
-        const mouse = { x: canvas.width / 2, y: canvas.height / 2, isDown: false };
-
-        // Player Object Setup
-        const player = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            radius: 18,
-            speed: 4,
-            health: 100,
-            maxHealth: 100,
-            // Weapon & Upgrade State
-            currentWeapon: 'pistol',
-            fireRate: BASE_PISTOL_FIRERATE,
-            speedMultiplier: 1,
-            damageMultiplier: 1,
-            upgrades: []
-        };
-
-        // --- GAME START & RESET LOGIC ---
-
-        function restartGame() {
-            // 1. Hide Game Over Screen
-            document.getElementById('game-over').style.display = 'none';
-            isGameOver = false;
-
-            // 2. Explicitly Reset Wave & Score
-            currentWave = 1;
-            score = 0;
-
-            // 3. Completely Reset Player Stats & Upgrades
-            player.health = player.maxHealth;
-            player.x = canvas.width / 2;
-            player.y = canvas.height / 2;
-            
-            // Revert Weapon to Pistol State
-            player.currentWeapon = 'pistol';
-            player.fireRate = BASE_PISTOL_FIRERATE;
-            
-            // Revert Multipliers & Upgrades
-            player.speedMultiplier = 1;
-            player.damageMultiplier = 1;
-            player.upgrades = [];
-
-            // 4. Wipe All World Entities
-            zombies = [];
-            drops = [];
-            barrels = [];
-            projectiles = [];
-
-            // 5. Initialize Wave 1
-            startWave(currentWave);
-            updateUI();
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-        // --- WAVE TRANSITION LOGIC ---
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], speechBubbles: [], wave: 1, waveActive: false, shopTimer: 30, gameOver: false };
+        let selectedAvatarSymbol = '🤠';
+        let isDead = false;
 
-        function startWave(waveNumber) {
-            // CLEAR GROUND: Remove remaining drops and barrels when starting a wave
-            drops = [];
-            barrels = [];
-            projectiles = [];
+        let particles = [];
+        let floatingTexts = [];
+        let cameraShake = 0;
+        let lastHp = {};
 
-            // Spawn Barrels for the wave
-            spawnBarrels(3);
-
-            // Spawn Zombies based on wave number
-            const zombieCount = waveNumber * 5;
-            for (let i = 0; i < zombieCount; i++) {
-                spawnZombie();
-            }
-
-            updateUI();
-        }
-
-        function checkWaveProgress() {
-            // Trigger next wave only when all zombies are eliminated
-            if (zombies.length === 0 && !isGameOver) {
-                currentWave++;
-                startWave(currentWave);
-            }
-        }
-
-        // --- SPAWN HELPERS ---
-
-        function spawnZombie() {
-            // Spawn around canvas borders
-            let x, y;
-            if (Math.random() < 0.5) {
-                x = Math.random() < 0.5 ? -20 : canvas.width + 20;
-                y = Math.random() * canvas.height;
-            } else {
-                x = Math.random() * canvas.width;
-                y = Math.random() < 0.5 ? -20 : canvas.height + 20;
-            }
-
-            zombies.push({
-                x: x,
-                y: y,
-                radius: 16,
-                speed: 1.5 + (currentWave * 0.1),
-                health: 30 + (currentWave * 5)
-            });
-        }
-
-        function spawnBarrels(count) {
+        function addParticle(x, y, color, count = 5, speed = 4) {
             for (let i = 0; i < count; i++) {
-                barrels.push({
-                    x: 100 + Math.random() * (canvas.width - 200),
-                    y: 100 + Math.random() * (canvas.height - 200),
-                    radius: 20,
-                    health: 50
+                const angle = Math.random() * Math.PI * 2;
+                const spd = Math.random() * speed + 1;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    color,
+                    size: Math.random() * 4 + 2,
+                    life: 20 + Math.random() * 10
                 });
             }
         }
 
-        function createDrop(x, y) {
-            // Spawn a minigun pickup drop
-            drops.push({
-                x: x,
-                y: y,
-                type: 'minigun',
-                radius: 12
+        function addFloatingText(x, y, text, color = '#f1c40f') {
+            floatingTexts.push({
+                x, y,
+                text,
+                color,
+                vy: -1.5,
+                alpha: 1.0,
+                life: 40
             });
         }
 
-        // --- INPUT ENGINE ---
-
-        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-        window.addEventListener('mousemove', (e) => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
+        socket.on('connect', function onFirstConnect() {
+            socket.off('connect', onFirstConnect);
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomCode = urlParams.get('room');
+            if (roomCode) {
+                document.getElementById('party-code-input').value = roomCode;
+                socket.emit('joinParty', roomCode);
+            }
         });
-        window.addEventListener('mousedown', () => mouse.isDown = true);
-        window.addEventListener('mouseup', () => mouse.isDown = false);
 
-        // --- SHOOTING & WEAPONS ---
+        function createParty() { socket.emit('createParty'); }
+        function joinParty() { socket.emit('joinParty', document.getElementById('party-code-input').value); }
+        function selectClass(cls) { socket.emit('selectClass', cls); }
+        function selectAvatar(avatar, el) {
+            selectedAvatarSymbol = avatar;
+            document.querySelectorAll('.avatar-btn').forEach(btn => btn.classList.remove('selected'));
+            el.classList.add('selected');
+            socket.emit('selectAvatar', avatar);
+        }
+        function startGame() { socket.emit('startGame'); }
+        function startWaveEarly() { socket.emit('startWaveEarly'); }
+        function retryGame() { socket.emit('retryGame'); }
+        function buyItem(item) { socket.emit('buy', item); }
+        function goToMainMenu() { 
+            window.history.replaceState({}, document.title, window.location.pathname);
+            location.reload(); 
+        }
 
-        function shoot() {
-            const now = Date.now();
-            if (now - lastShotTime < player.fireRate) return;
-            lastShotTime = now;
+        function showTip(title, desc, stats, cost) {
+            document.querySelector('#tooltip-box h4').innerText = title;
+            document.getElementById('tip-desc').innerText = desc;
+            document.getElementById('tip-stats').innerHTML = `<b>Specs:</b> ${stats}<br><b>Cost:</b> $${cost}`;
+        }
+        function clearTip() {
+            document.querySelector('#tooltip-box h4').innerText = "Armory Intel";
+            document.getElementById('tip-desc').innerText = "Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.";
+            document.getElementById('tip-stats').innerHTML = "";
+        }
 
-            const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-            projectiles.push({
-                x: player.x,
-                y: player.y,
-                vx: Math.cos(angle) * 12,
-                vy: Math.sin(angle) * 12,
-                damage: 25 * player.damageMultiplier,
-                radius: 4
+        socket.on('partyCreated', (code) => {
+            mainMenu.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            partyCodeDisplay.innerText = `Party Code: ${code}`;
+            startGameBtn.classList.remove('hidden');
+            socket.emit('selectAvatar', selectedAvatarSymbol);
+
+            const newUrl = `${window.location.pathname}?room=${code}`;
+            window.history.replaceState({ room: code }, '', newUrl);
+        });
+
+        socket.on('partyJoined', (code) => {
+            mainMenu.classList.add('hidden');
+            lobbyScreen.classList.remove('hidden');
+            partyCodeDisplay.innerText = `Party Code: ${code}`;
+            socket.emit('selectAvatar', selectedAvatarSymbol);
+
+            const newUrl = `${window.location.pathname}?room=${code}`;
+            window.history.replaceState({ room: code }, '', newUrl);
+        });
+
+        socket.on('partyError', (msg) => { errorMsg.innerText = msg; });
+
+        socket.on('lobbyUpdate', (players) => {
+            playerList.innerHTML = '';
+            for (let id in players) {
+                let p = players[id];
+                let li = document.createElement('li');
+                li.style.padding = '6px 0';
+                li.innerText = `${p.avatar || '🤠'} Player (${id === socket.id ? 'You' : 'Teammate'}) — Class: ${p.class.toUpperCase()}`;
+                playerList.appendChild(li);
+            }
+        });
+
+        socket.on('gameStarted', () => {
+            lobbyScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            inGameMenuBtn.classList.remove('hidden');
+        });
+
+        socket.on('stateUpdate', (state) => {
+            if (state.explosions && state.explosions.length > gameState.explosions.length) {
+                cameraShake = 12;
+                state.explosions.forEach(ex => addParticle(ex.x, ex.y, '#e74c3c', 25, 8));
+            }
+
+            gameState = state;
+
+            document.getElementById('wave-display').innerText = gameState.wave;
+            document.getElementById('shop-timer').innerText = gameState.shopTimer;
+
+            let mapIndex = Math.floor((gameState.wave - 1) / 10);
+            let mapNames = ["Apocalypse City", "Wild West Canyon", "Cyber Neon City", "Alien Wasteland"];
+            document.getElementById('map-display').innerText = mapNames[mapIndex % mapNames.length];
+
+            // Game Over Check
+            if (gameState.gameOver) {
+                gameOverScreen.classList.remove('hidden');
+                deathScreen.classList.add('hidden');
+                shop.classList.add('hidden');
+            } else {
+                gameOverScreen.classList.add('hidden');
+            }
+
+            let me = gameState.players[socket.id];
+            if (me) {
+                document.getElementById('money-display').innerText = me.money;
+                document.getElementById('shop-money-display').innerText = me.money;
+
+                document.getElementById('hp-display').innerText = `${Math.max(0, Math.ceil(me.hp))}/${me.maxHp}`;
+                
+                let hpPercent = Math.max(0, (me.hp / me.maxHp) * 100);
+                document.getElementById('hp-bar').style.width = `${hpPercent}%`;
+
+                if (hpPercent < 30 && me.hp > 0) {
+                    vignette.classList.add('critical');
+                } else {
+                    vignette.classList.remove('critical');
+                }
+
+                if (lastHp[socket.id] !== undefined && me.hp < lastHp[socket.id]) {
+                    const dmgTaken = Math.round(lastHp[socket.id] - me.hp);
+                    addFloatingText(me.x + me.size/2, me.y, `-${dmgTaken}`, '#e74c3c');
+                    addParticle(me.x + me.size/2, me.y + me.size/2, '#e74c3c', 8, 4);
+                }
+                lastHp[socket.id] = me.hp;
+
+                // Death screen handling when individual player dies vs all players
+                if (!gameState.gameOver) {
+                    if (me.hp <= 0 && !isDead) {
+                        isDead = true;
+                        deathScreen.classList.remove('hidden');
+                    } else if (me.hp > 0 && isDead) {
+                        isDead = false;
+                        deathScreen.classList.add('hidden');
+                    }
+                }
+
+                let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
+                let statusText = ``;
+                if (me.dashCooldown > 0) statusText += ` | Dash: ${(me.dashCooldown / 30).toFixed(1)}s`;
+                if (me.powerUpType) statusText += ` | [⚡ ${me.powerUpType.toUpperCase()}]`;
+
+                if (me.class === 'marksman' && me.weaponType !== 'megaWeapon') {
+                    extraStat.innerText = me.reloading ? `[${weaponName}] Reloading...` : `[${weaponName}] ${me.ammo}/${me.maxAmmo} Ammo ${statusText}`;
+                } else if (me.class === 'mage' && me.weaponType !== 'megaWeapon') {
+                    extraStat.innerText = `[${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana} ${statusText}`;
+                } else {
+                    extraStat.innerText = `[${weaponName}] ${statusText}`;
+                }
+            }
+
+            if (!gameState.waveActive && !gameState.gameOver) {
+                shop.classList.remove('hidden');
+            } else {
+                shop.classList.add('hidden');
+            }
+        });
+
+        const keys = {};
+        window.addEventListener('keydown', (e) => { 
+            keys[e.key.toLowerCase()] = true; 
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (lobbyScreen.classList.contains('hidden') && shop.classList.contains('hidden')) {
+                    const me = gameState.players[socket.id];
+                    if (me && me.dashCooldown === 0) {
+                        addParticle(me.x + me.size/2, me.y + me.size/2, '#3498db', 12, 5);
+                    }
+                    socket.emit('move', {
+                        up: keys['w'] || keys['arrowup'],
+                        down: keys['s'] || keys['arrowdown'],
+                        left: keys['a'] || keys['arrowleft'],
+                        right: keys['d'] || keys['arrowright'],
+                        dash: true
+                    });
+                }
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        setInterval(() => {
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            if (!shop.classList.contains('hidden')) return;
+            socket.emit('move', {
+                up: keys['w'] || keys['arrowup'],
+                down: keys['s'] || keys['arrowdown'],
+                left: keys['a'] || keys['arrowleft'],
+                right: keys['d'] || keys['arrowright'],
+                dash: false
             });
-        }
+        }, 1000 / 30);
 
-        // --- GAME OVER ---
+        let mouseDown = false;
+        let lastMousePos = { x: 0, y: 0 };
 
-        function triggerGameOver() {
-            isGameOver = true;
-            document.getElementById('finalWave').innerText = `You made it to Wave ${currentWave}`;
-            document.getElementById('game-over').style.display = 'block';
-        }
+        canvas.addEventListener('mousemove', (e) => {
+            lastMousePos.x = e.clientX;
+            lastMousePos.y = e.clientY;
+        });
 
-        // --- UI SYNC ---
+        canvas.addEventListener('mousedown', (e) => {
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            if (!shop.classList.contains('hidden')) return;
+            mouseDown = true;
+            const me = gameState.players[socket.id];
+            if (!me) return;
+            const camX = me.x - canvas.width / 2;
+            const camY = me.y - canvas.height / 2;
+            socket.emit('shoot', { x: e.clientX + camX, y: e.clientY + camY });
+        });
 
-        function updateUI() {
-            document.getElementById('healthDisplay').innerText = `Health: ${Math.max(0, Math.round(player.health))}`;
-            document.getElementById('waveDisplay').innerText = `Wave: ${currentWave}`;
-            document.getElementById('weaponDisplay').innerText = `Weapon: ${player.currentWeapon.toUpperCase()} (Rate: ${player.fireRate}ms)`;
-            document.getElementById('upgradeDisplay').innerText = `Upgrades: ${player.upgrades.length > 0 ? player.upgrades.join(', ') : 'None'}`;
-        }
+        canvas.addEventListener('mouseup', () => { mouseDown = false; });
+        canvas.addEventListener('mouseleave', () => { mouseDown = false; });
 
-        // --- MAIN UPDATE LOOP ---
-
-        function update() {
-            if (isGameOver) return;
-
-            // Player Movement
-            let moveSpeed = player.speed * player.speedMultiplier;
-            if (keys['w'] || keys['arrowup']) player.y -= moveSpeed;
-            if (keys['s'] || keys['arrowdown']) player.y += moveSpeed;
-            if (keys['a'] || keys['arrowleft']) player.x -= moveSpeed;
-            if (keys['d'] || keys['arrowright']) player.x += moveSpeed;
-
-            // Shooting
-            if (mouse.isDown) {
-                shoot();
-            }
-
-            // Update Bullets
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                let p = projectiles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-
-                // Remove offscreen projectiles
-                if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
-                    projectiles.splice(i, 1);
-                    continue;
-                }
-
-                // Bullet vs Zombie Collision
-                for (let j = zombies.length - 1; j >= 0; j--) {
-                    let z = zombies[j];
-                    let dist = Math.hypot(p.x - z.x, p.y - z.y);
-                    if (dist < p.radius + z.radius) {
-                        z.health -= p.damage;
-                        projectiles.splice(i, 1);
-
-                        if (z.health <= 0) {
-                            // 20% chance to drop minigun item on death
-                            if (Math.random() < 0.2) createDrop(z.x, z.y);
-                            zombies.splice(j, 1);
-                        }
-                        break;
-                    }
-                }
-            }
-
-            // Update Zombies
-            for (let i = zombies.length - 1; i >= 0; i--) {
-                let z = zombies[i];
-                let angle = Math.atan2(player.y - z.y, player.x - z.x);
-                z.x += Math.cos(angle) * z.speed;
-                z.y += Math.sin(angle) * z.speed;
-
-                // Zombie vs Player Collision
-                let dist = Math.hypot(player.x - z.x, player.y - z.y);
-                if (dist < player.radius + z.radius) {
-                    player.health -= 0.5;
-                    updateUI();
-                    if (player.health <= 0) {
-                        triggerGameOver();
-                    }
-                }
-            }
-
-            // Update Ground Drops (Pickups)
-            for (let i = drops.length - 1; i >= 0; i--) {
-                let d = drops[i];
-                let dist = Math.hypot(player.x - d.x, player.y - d.y);
-                if (dist < player.radius + d.radius) {
-                    if (d.type === 'minigun') {
-                        player.currentWeapon = 'minigun';
-                        player.fireRate = MINIGUN_FIRERATE; // Instant fire rate boost
-                        if (!player.upgrades.includes('Minigun')) {
-                            player.upgrades.push('Minigun');
-                        }
-                    }
-                    drops.splice(i, 1);
-                    updateUI();
-                }
-            }
-
-            checkWaveProgress();
-        }
-
-        // --- MAIN DRAW LOOP ---
+        setInterval(() => {
+            if (!mouseDown) return;
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            if (!shop.classList.contains('hidden')) return;
+            const me = gameState.players[socket.id];
+            if (!me || me.hp <= 0) return;
+            const camX = me.x - canvas.width / 2;
+            const camY = me.y - canvas.height / 2;
+            socket.emit('shoot', { x: lastMousePos.x + camX, y: lastMousePos.y + camY });
+        }, 100);
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (isGameOver) return;
+            if (lobbyScreen.classList.contains('hidden')) {
+                const me = gameState.players[socket.id];
+                let camX = me ? me.x - canvas.width / 2 : 0;
+                let camY = me ? me.y - canvas.height / 2 : 0;
 
-            // Draw Barrels
-            ctx.fillStyle = '#795548';
-            barrels.forEach(b => {
+                if (cameraShake > 0) {
+                    camX += (Math.random() - 0.5) * cameraShake;
+                    camY += (Math.random() - 0.5) * cameraShake;
+                    cameraShake *= 0.85;
+                    if (cameraShake < 0.5) cameraShake = 0;
+                }
+
+                ctx.save();
+                ctx.translate(-camX, -camY);
+
+                let mapIndex = Math.floor((gameState.wave - 1) / 10) % 4;
+                let bgColors = ['#12121c', '#2c1e14', '#0a192f', '#1b1220'];
+                let gridColors = ['#20202d', '#3d291b', '#102a43', '#281832'];
+                let borderColors = ['#f1c40f', '#d35400', '#00ffcc', '#ff00ff'];
+
+                ctx.fillStyle = bgColors[mapIndex];
+                ctx.fillRect(0, 0, 2000, 2000);
+
+                ctx.strokeStyle = gridColors[mapIndex];
+                ctx.lineWidth = 2;
+                for (let i = 0; i <= 2000; i += 100) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0); ctx.lineTo(i, 2000);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(0, i); ctx.lineTo(2000, i);
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = borderColors[mapIndex];
+                ctx.lineWidth = 8;
                 ctx.beginPath();
-                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-                ctx.fill();
-            });
+                ctx.arc(1000, 1000, 950, 0, Math.PI * 2);
+                ctx.stroke();
 
-            // Draw Drops
-            drops.forEach(d => {
-                ctx.fillStyle = '#ffeb3b';
-                ctx.beginPath();
-                ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
-                ctx.fill();
-            });
+                if (gameState.barrels) {
+                    gameState.barrels.forEach(barrel => {
+                        ctx.font = '32px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('🛢️', barrel.x + barrel.size/2, barrel.y + barrel.size/2);
+                    });
+                }
 
-            // Draw Bullets
-            ctx.fillStyle = '#fff59d';
-            projectiles.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fill();
-            });
+                if (gameState.explosions) {
+                    gameState.explosions.forEach(ex => {
+                        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
+                        ctx.lineWidth = 6;
+                        ctx.beginPath();
+                        ctx.arc(ex.x, ex.y, ex.radius * (1 - (ex.life / 15)), 0, Math.PI * 2);
+                        ctx.stroke();
+                    });
+                }
 
-            // Draw Zombies
-            ctx.fillStyle = '#4caf50';
-            zombies.forEach(z => {
-                ctx.beginPath();
-                ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2);
-                ctx.fill();
-            });
+                gameState.pickups.forEach(p => {
+                    ctx.font = '32px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    let icon = '❤️';
+                    if (p.type === 'speed') icon = '⚡';
+                    if (p.type === 'doubleDamage') icon = '⭐';
+                    ctx.fillText(icon, p.x, p.y);
+                });
 
-            // Draw Player
-            ctx.fillStyle = '#2196f3';
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-            ctx.fill();
+                gameState.bullets.forEach(b => {
+                    ctx.fillStyle = '#f39c12';
+                    ctx.shadowColor = '#f39c12';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                });
 
-            // Draw Player Gun Pointer
-            const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(player.x, player.y);
-            ctx.lineTo(player.x + Math.cos(angle) * 28, player.y + Math.sin(angle) * 28);
-            ctx.stroke();
+                gameState.zombies.forEach(z => {
+                    ctx.font = `${z.size * 1.2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    let emoji = '🧟';
+                    if (z.type === 'boss') {
+                        emoji = mapIndex === 1 ? '🐂' : mapIndex === 2 ? '🤖' : mapIndex === 3 ? '👾' : '👹';
+                    } else {
+                        if (mapIndex === 1) emoji = '🤠'; 
+                        else if (mapIndex === 2) emoji = '🤖'; 
+                        else if (mapIndex === 3) emoji = '👽'; 
+                    }
+
+                    ctx.fillText(emoji, z.x + z.size / 2, z.y + z.size / 2);
+
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(z.x, z.y - 12, z.size, 5);
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(z.x, z.y - 12, z.size * Math.max(0, (z.hp / z.maxHp)), 5);
+                    ctx.fillStyle = '#f39c12';
+                });
+
+                for (let id in gameState.players) {
+                    let p = gameState.players[id];
+                    if (p.hp > 0) {
+                        if (p.hasForceField) {
+                            ctx.strokeStyle = '#3498db';
+                            ctx.shadowColor = '#3498db';
+                            ctx.shadowBlur = 12;
+                            ctx.lineWidth = 4;
+                            ctx.beginPath();
+                            ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size * 1.5, 0, Math.PI * 2);
+                            ctx.stroke();
+                            ctx.shadowBlur = 0;
+                        }
+
+                        ctx.font = `${p.size * 1.2}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(p.avatar || '🤠', p.x + p.size / 2, p.y + p.size / 2);
+
+                        ctx.fillStyle = '#ff0000';
+                        ctx.fillRect(p.x, p.y - 15, p.size, 5);
+                        ctx.fillStyle = '#00ff00';
+                        ctx.fillRect(p.x, p.y - 15, p.size * Math.max(0, (p.hp / p.maxHp)), 5);
+                        ctx.fillStyle = '#f39c12';
+                    }
+                }
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let pt = particles[i];
+                    pt.x += pt.vx;
+                    pt.y += pt.vy;
+                    pt.life--;
+                    ctx.fillStyle = pt.color;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    if (pt.life <= 0) particles.splice(i, 1);
+                }
+
+                for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                    let ft = floatingTexts[i];
+                    ft.y += ft.vy;
+                    ft.life--;
+                    ctx.font = '900 16px Segoe UI, sans-serif';
+                    ctx.fillStyle = ft.color;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    if (ft.life <= 0) floatingTexts.splice(i, 1);
+                }
+
+                if (gameState.speechBubbles) {
+                    gameState.speechBubbles.forEach(sb => {
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        let metrics = ctx.measureText(sb.text);
+                        let padding = 8;
+
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                        ctx.fillRect(sb.x - metrics.width/2 - padding, sb.y - 25 - padding, metrics.width + padding*2, 28 + padding);
+                        ctx.strokeStyle = '#f1c40f';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(sb.x - metrics.width/2 - padding, sb.y - 25 - padding, metrics.width + padding*2, 28 + padding);
+
+                        ctx.fillStyle = '#f1c40f';
+                        ctx.fillText(sb.text, sb.x, sb.y - 12);
+                    });
+                }
+
+                ctx.restore();
+            }
+
+            requestAnimationFrame(draw);
         }
 
-        // --- GAME LOOP ROUTINE ---
-
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Start initial game instance
-        restartGame();
-        gameLoop();
+        requestAnimationFrame(draw);
     </script>
 </body>
 </html>
