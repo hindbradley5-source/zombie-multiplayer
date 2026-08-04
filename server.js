@@ -42,7 +42,7 @@ function makePlayer(stats, x, y) {
         size: 35,
         hp: stats.maxHp,
         money: 0,
-        moneyGainMultiplier: 1.0, // Base 1.0 multiplier (can be upgraded +1% at a time)
+        moneyGainMultiplier: 1.0,
         class: 'marksman',
         baseClass: 'marksman',
         avatar: '🤠',
@@ -75,7 +75,8 @@ io.on('connection', (socket) => {
             gameStarted: false,
             bossSpawnedThisWave: false,
             shopTimer: 30,
-            waveClearHandled: false
+            waveClearHandled: false,
+            gameOver: false
         };
         socket.roomCode = code;
         socket.join(code);
@@ -147,18 +148,60 @@ io.on('connection', (socket) => {
         room.zombiesToSpawn = 5;
         room.totalZombiesThisWave = 5;
         room.waveClearHandled = false;
+        room.gameOver = false;
         io.to(socket.roomCode).emit('gameStarted');
     });
 
     socket.on('startWaveEarly', () => {
         const room = rooms[socket.roomCode];
-        if (!room || room.waveActive) return;
+        if (!room || room.waveActive || room.gameOver) return;
         room.shopTimer = 0;
+    });
+
+    socket.on('retryGame', () => {
+        const room = rooms[socket.roomCode];
+        if (!room || !room.gameOver) return;
+
+        room.wave = 1;
+        room.zombies = [];
+        room.bullets = [];
+        room.pickups = [];
+        room.explosions = [];
+        room.speechBubbles = [];
+        room.zombiesToSpawn = 5;
+        room.totalZombiesThisWave = 5;
+        room.bossSpawnedThisWave = false;
+        room.waveActive = false;
+        room.shopTimer = 30;
+        room.gameOver = false;
+        room.waveClearHandled = false;
+
+        for (let id in room.players) {
+            const p = room.players[id];
+            const baseStats = classData[p.baseClass || 'marksman'];
+            Object.assign(p, {
+                hp: baseStats.maxHp,
+                maxHp: baseStats.maxHp,
+                damage: baseStats.damage,
+                speed: baseStats.speed,
+                money: 0,
+                moneyGainMultiplier: 1.0,
+                x: ARENA_CENTER_X + (Math.random() * 60 - 30),
+                y: ARENA_CENTER_Y + (Math.random() * 60 - 30),
+                weaponType: baseStats.weaponType || 'pistol',
+                ammo: baseStats.ammo || 0,
+                maxAmmo: baseStats.maxAmmo || 0,
+                mana: baseStats.mana || 0,
+                maxMana: baseStats.maxMana || 0,
+                hasForceField: false,
+                reloading: false
+            });
+        }
     });
 
     socket.on('move', (input) => {
         const room = rooms[socket.roomCode];
-        if (!room || !room.gameStarted) return;
+        if (!room || !room.gameStarted || room.gameOver) return;
         const p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
@@ -197,7 +240,7 @@ io.on('connection', (socket) => {
 
     socket.on('shoot', (target) => {
         const room = rooms[socket.roomCode];
-        if (!room || !room.gameStarted) return;
+        if (!room || !room.gameStarted || room.gameOver) return;
         const p = room.players[socket.id];
         if (!p || p.hp <= 0 || p.reloading) return;
 
@@ -236,23 +279,9 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('respawn', () => {
-        const room = rooms[socket.roomCode];
-        if (!room || room.waveActive) return;
-        const p = room.players[socket.id];
-        if (p && p.hp <= 0) {
-            p.hp = p.maxHp;
-            p.x = ARENA_CENTER_X + (Math.random() * 60 - 30);
-            p.y = ARENA_CENTER_Y + (Math.random() * 60 - 30);
-            if (p.class === 'marksman') p.ammo = p.maxAmmo;
-            if (p.class === 'mage') p.mana = p.maxMana;
-            p.reloading = false;
-        }
-    });
-
     socket.on('buy', (item) => {
         const room = rooms[socket.roomCode];
-        if (!room) return;
+        if (!room || room.gameOver) return;
         const p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
@@ -283,7 +312,6 @@ io.on('connection', (socket) => {
         else if (item === 'maxHealth' && p.money >= 120)   { p.money -= 120; p.maxHp += Math.round(base.maxHp * 0.10); p.hp = p.maxHp; }
         else if (item === 'damage'    && p.money >= 100)   { p.money -= 100; p.damage += Math.max(1, Math.round(base.damage * 0.01)); }
         else if (item === 'speed'     && p.money >= 75)    { p.money -= 75;  p.speed += Number((base.speed * 0.01).toFixed(2)); }
-        // NEW +1% Gold Gain Upgrade Logic ($100 per 1%)
         else if (item === 'moneyGain' && p.money >= 100)   { p.money -= 100; p.moneyGainMultiplier = Number(((p.moneyGainMultiplier || 1.0) + 0.01).toFixed(2)); }
         else if (item === 'shotgun'   && p.class === 'marksman' && p.money >= 150  && !['shotgun','minigun','megaWeapon'].includes(p.weaponType))   { p.money -= 150;  p.weaponType = 'shotgun';  p.maxAmmo = 8;   p.ammo = 8;   p.damage = 22;  p.attackSpeed = 'Slow (0.9s)'; }
         else if (item === 'minigun'   && p.class === 'marksman' && p.money >= 250  && !['minigun','megaWeapon'].includes(p.weaponType))             { p.money -= 250;  p.weaponType = 'minigun';  p.maxAmmo = 200; p.ammo = 200; p.damage = 15;  p.bulletSize = base.bulletSize * 3; p.attackSpeed = 'Very Fast (0.2s)'; }
@@ -309,7 +337,13 @@ io.on('connection', (socket) => {
 setInterval(() => {
     for (let code in rooms) {
         const room = rooms[code];
-        if (!room.gameStarted) continue;
+        if (!room.gameStarted || room.gameOver) continue;
+
+        // Check if all players are dead -> Trigger Game Over
+        const playerList = Object.values(room.players);
+        if (playerList.length > 0 && playerList.every(p => p.hp <= 0)) {
+            room.gameOver = true;
+        }
 
         for (let id in room.players) {
             const p = room.players[id];
@@ -420,12 +454,10 @@ setInterval(() => {
                     z.hp -= b.damage;
                     b.markedForDeletion = true;
 
-                    // When Zombie is killed:
                     if (z.hp <= 0 && !z.rewarded) {
                         z.rewarded = true;
                         const baseReward = z.type === 'boss' ? 800 : 35;
                         
-                        // Give money to ALL active players in the game, scaled by their moneyGainMultiplier
                         for (let id in room.players) {
                             const recipient = room.players[id];
                             if (recipient.hp > 0) {
@@ -480,12 +512,20 @@ setInterval(() => {
             room.shopTimer = 30;
 
             const baseRoundBonus = 100 + (room.wave * 50);
+            
+            // Respawn all dead players for the next round & reward alive/respawned players
             for (let id in room.players) {
                 const recipient = room.players[id];
-                if (recipient.hp > 0) {
-                    const mult = recipient.moneyGainMultiplier || 1.0;
-                    recipient.money += Math.round(baseRoundBonus * mult);
+                if (recipient.hp <= 0) {
+                    recipient.hp = recipient.maxHp;
+                    recipient.x = ARENA_CENTER_X + (Math.random() * 60 - 30);
+                    recipient.y = ARENA_CENTER_Y + (Math.random() * 60 - 30);
+                    if (recipient.class === 'marksman') recipient.ammo = recipient.maxAmmo;
+                    if (recipient.class === 'mage') recipient.mana = recipient.maxMana;
+                    recipient.reloading = false;
                 }
+                const mult = recipient.moneyGainMultiplier || 1.0;
+                recipient.money += Math.round(baseRoundBonus * mult);
             }
 
             room.pickups.push({ x: ARENA_CENTER_X + (Math.random() * 200 - 100), y: ARENA_CENTER_Y + (Math.random() * 200 - 100), type: 'health' });
@@ -507,7 +547,8 @@ setInterval(() => {
             speechBubbles: room.speechBubbles,
             wave: room.wave,
             waveActive: room.waveActive,
-            shopTimer: Math.ceil(room.shopTimer)
+            shopTimer: Math.ceil(room.shopTimer),
+            gameOver: room.gameOver
         });
     }
 }, 1000 / 30);
