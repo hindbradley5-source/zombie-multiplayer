@@ -166,7 +166,6 @@ io.on('connection', (socket) => {
         room.zombies = [];
         room.bullets = [];
         room.pickups = [];
-        room.barrels = [];
         room.explosions = [];
         room.speechBubbles = [];
         room.zombiesToSpawn = 5;
@@ -177,13 +176,6 @@ io.on('connection', (socket) => {
         room.gameOver = false;
         room.waveClearHandled = false;
 
-        // Reset arena barrels for the new match
-        for (let i = 0; i < 6; i++) {
-            let angle = Math.random() * Math.PI * 2;
-            let dist  = Math.random() * (ARENA_RADIUS - 200);
-            room.barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
-        }
-
         for (let id in room.players) {
             const p = room.players[id];
             const baseStats = classData[p.baseClass || 'marksman'];
@@ -192,9 +184,6 @@ io.on('connection', (socket) => {
                 maxHp: baseStats.maxHp,
                 damage: baseStats.damage,
                 speed: baseStats.speed,
-                bulletSize: baseStats.bulletSize,
-                bulletSpeed: baseStats.bulletSpeed,
-                attackSpeed: baseStats.attackSpeed,
                 money: 0,
                 moneyGainMultiplier: 1.0,
                 x: ARENA_CENTER_X + (Math.random() * 60 - 30),
@@ -205,10 +194,7 @@ io.on('connection', (socket) => {
                 mana: baseStats.mana || 0,
                 maxMana: baseStats.maxMana || 0,
                 hasForceField: false,
-                dashCooldown: 0,
-                reloading: false,
-                powerUpType: null,
-                powerUpTimer: 0
+                reloading: false
             });
         }
     });
@@ -542,13 +528,9 @@ setInterval(() => {
                 recipient.money += Math.round(baseRoundBonus * mult);
             }
 
-            // Clear uncollected consumables and spawn fresh wave health pickup
-            room.pickups = [];
             room.pickups.push({ x: ARENA_CENTER_X + (Math.random() * 200 - 100), y: ARENA_CENTER_Y + (Math.random() * 200 - 100), type: 'health' });
 
-            // Reset barrels cleanly for the new wave
-            room.barrels = [];
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < 3; i++) {
                 const angle = Math.random() * Math.PI * 2;
                 const dist  = Math.random() * (ARENA_RADIUS - 200);
                 room.barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
