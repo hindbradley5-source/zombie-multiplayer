@@ -1367,7 +1367,7 @@ setInterval(() => {
             gameOver: room.gameOver,
             environmentalEvent: room.environmentalEvent,
             isBossRush: room.isBossRush,
-            bossHpRatio: bossZombie ? (bossZombie.hp / bossZombie.maxHp) : null
+            bossHpRatio: (bossZombie && bossZombie.maxHp) ? (bossZombie.hp / Math.max(1, bossZombie.maxHp)) : null
         });
     }
 }, 1000 / 30);
