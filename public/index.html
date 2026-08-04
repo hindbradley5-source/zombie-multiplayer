@@ -4,201 +4,416 @@
     <meta charset="UTF-8">
     <title>Zombie Multiplayer Survival</title>
     <style>
+        :root {
+            --bg-dark: #0b0b14;
+            --panel-bg: rgba(18, 18, 30, 0.75);
+            --panel-border: rgba(255, 255, 255, 0.12);
+            --accent-gold: #f1c40f;
+            --accent-red: #e74c3c;
+            --accent-blue: #3498db;
+            --accent-green: #2ecc71;
+            --accent-purple: #9b59b6;
+        }
+
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #0b0b14;
+            background-color: var(--bg-dark);
             color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             overflow: hidden;
+            user-select: none;
         }
+
         #game-container {
             position: relative;
             width: 100vw;
             height: 100vh;
         }
+
         canvas {
             display: block;
             background-color: #12121c;
         }
+
+        /* Screens & Modals */
         .screen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: radial-gradient(circle at center, #1b1b2f 0%, #080811 100%);
+            background: radial-gradient(circle at center, #1c1c30 0%, #07070f 100%);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 10;
         }
+
         .hidden {
             display: none !important;
         }
+
+        /* Low Health Vignette Overlay */
+        #vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            box-shadow: inset 0 0 100px rgba(231, 76, 60, 0);
+            transition: box-shadow 0.3s ease;
+            z-index: 4;
+        }
+
+        #vignette.critical {
+            animation: pulseVignette 1.2s infinite alternate;
+        }
+
+        @keyframes pulseVignette {
+            0% { box-shadow: inset 0 0 60px rgba(231, 76, 60, 0.4); }
+            100% { box-shadow: inset 0 0 140px rgba(231, 76, 60, 0.8); }
+        }
+
+        /* Buttons & Inputs */
         input, button {
             padding: 12px 24px;
-            margin: 8px;
-            font-size: 16px;
-            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 10px;
             border: none;
             cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        input {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
-            text-align: center;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             outline: none;
         }
+
+        input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--panel-border);
+            color: #fff;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
         input:focus {
-            border-color: #f1c40f;
-            box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
+            border-color: var(--accent-gold);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.3);
         }
+
         button {
-            background: linear-gradient(135deg, #27ae60, #219653);
+            background: linear-gradient(135deg, #27ae60, #1e8449);
             color: white;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
         }
+
         button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.5);
+            filter: brightness(1.1);
         }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Top HUD */
         #hud {
             position: absolute;
             top: 15px;
             left: 20px;
             z-index: 5;
             pointer-events: none;
-            font-size: 18px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px #000;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(12px);
+            padding: 10px 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
         }
+
+        .hud-card {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .hud-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8a8a9e;
+            font-weight: 700;
+        }
+
+        .hud-value {
+            font-size: 16px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .hud-divider {
+            width: 1px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Health Bar Gauge */
+        .hp-bar-outer {
+            width: 140px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+            margin-top: 3px;
+        }
+
+        .hp-bar-inner {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #e74c3c, #2ecc71);
+            transition: width 0.25s ease;
+            border-radius: 6px;
+        }
+
         #top-right-controls {
             position: absolute;
             top: 15px;
             right: 20px;
             z-index: 5;
-            display: flex;
-            gap: 10px;
         }
+
         #in-game-menu-btn {
-            padding: 8px 16px;
-            font-size: 14px;
-            background: linear-gradient(135deg, #7f8c8d, #95a5a6);
+            padding: 10px 18px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(10px);
             box-shadow: none;
         }
+        #in-game-menu-btn:hover {
+            background: rgba(231, 76, 60, 0.3);
+            border-color: var(--accent-red);
+        }
+
+        /* Shop Styling */
         #shop {
             position: absolute;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(5, 5, 10, 0.92);
+            background: rgba(8, 8, 16, 0.92);
+            backdrop-filter: blur(16px);
             z-index: 8;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
         }
+
+        .shop-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .shop-header h2 {
+            font-size: 32px;
+            margin: 0;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+        }
+
         .shop-container {
             display: flex;
             gap: 25px;
             align-items: flex-start;
+            max-width: 1000px;
         }
+
+        .shop-categories {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .shop-section-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #8a8a9e;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
         .shop-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            max-width: 600px;
+            gap: 10px;
         }
+
         .shop-grid button {
-            padding: 12px;
+            padding: 12px 16px;
             font-size: 13px;
-            width: 260px;
+            width: 250px;
             margin: 0;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            box-shadow: none;
         }
+
+        .shop-grid button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .price-badge {
+            background: rgba(241, 196, 15, 0.15);
+            color: var(--accent-gold);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
         #tooltip-box {
-            width: 260px;
-            min-height: 120px;
-            background: #1e1e2f;
-            border: 2px solid #f1c40f;
-            border-radius: 8px;
-            padding: 15px;
+            width: 280px;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-gold);
+            border-radius: 14px;
+            padding: 20px;
             box-sizing: border-box;
-            font-size: 14px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
+
         #tooltip-box h4 {
-            margin: 0 0 8px 0;
-            color: #f1c40f;
+            margin: 0 0 10px 0;
+            color: var(--accent-gold);
+            font-size: 16px;
         }
-        /* Fancy Menu Styles */
+
+        /* Menu Styling */
         .menu-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(20px);
             padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
             text-align: center;
-            max-width: 450px;
+            max-width: 440px;
             width: 100%;
         }
+
         .menu-title {
-            font-size: 38px;
+            font-size: 40px;
             font-weight: 900;
             background: linear-gradient(135deg, #f1c40f, #e74c3c);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            filter: drop-shadow(0 4px 12px rgba(231, 76, 60, 0.3));
         }
+
         .menu-subtitle {
-            color: #888;
+            color: #8a8a9e;
             font-size: 14px;
             margin-bottom: 25px;
+            font-weight: 500;
         }
+
         .avatar-grid {
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
             margin: 15px 0 25px 0;
         }
+
         .avatar-btn {
-            font-size: 28px;
-            background: rgba(255,255,255,0.05);
+            font-size: 26px;
+            background: rgba(255, 255, 255, 0.05);
             border: 2px solid transparent;
-            border-radius: 12px;
-            padding: 8px;
+            border-radius: 14px;
+            padding: 0;
             cursor: pointer;
-            width: 50px;
-            height: 50px;
+            width: 54px;
+            height: 54px;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s ease;
         }
+
+        .avatar-btn:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         .avatar-btn.selected {
-            border-color: #f1c40f;
+            border-color: var(--accent-gold);
             background: rgba(241, 196, 15, 0.15);
-            box-shadow: 0 0 10px rgba(241,196,15,0.4);
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+            transform: scale(1.1);
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <!-- HUD Top Left -->
+        <!-- Low HP Red Vignette Warning -->
+        <div id="vignette"></div>
+
+        <!-- Sleek HUD Top Left -->
         <div id="hud" class="hidden">
-            Wave: <span id="wave-display">1</span> | 
-            Map: <span id="map-display" style="color: #3498db;">Apocalypse City</span> | 
-            Money: $<span id="money-display">0</span> | 
-            HP: <span id="hp-display">100</span> 
-            <span id="extra-stat" style="color: #f1c40f; margin-left: 10px;"></span>
+            <div class="hud-card">
+                <div class="hud-label">Wave <span id="wave-display" style="color:var(--accent-gold);">1</span></div>
+                <div class="hud-value" id="map-display" style="font-size: 13px; color: var(--accent-blue);">Apocalypse City</div>
+            </div>
+
+            <div class="hud-divider"></div>
+
+            <div class="hud-card">
+                <div class="hud-label">Health</div>
+                <div class="hp-bar-outer">
+                    <div id="hp-bar" class="hp-bar-inner"></div>
+                </div>
+                <div id="hp-display" style="font-size: 11px; margin-top:2px; color:#aaa; font-weight:700;">100/100</div>
+            </div>
+
+            <div class="hud-divider"></div>
+
+            <div class="hud-card">
+                <div class="hud-label">Funds</div>
+                <div class="hud-value" style="color: var(--accent-green);">$<span id="money-display">0</span></div>
+            </div>
+
+            <div class="hud-divider"></div>
+
+            <div class="hud-card">
+                <div class="hud-label">Combat Output</div>
+                <div class="hud-value" id="extra-stat" style="font-size: 13px; color: var(--accent-gold);">Ready</div>
+            </div>
         </div>
 
         <!-- Top Right Controls -->
@@ -206,40 +421,57 @@
             <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
         </div>
 
-        <!-- Full-Screen Shop Overlay -->
+        <!-- Refined Full-Screen Shop Overlay -->
         <div id="shop" class="hidden">
-            <h2 style="color: #f1c40f; margin-bottom: 5px;">🛒 ARMORY & SHOP</h2>
-            <p style="font-size: 16px; margin-bottom: 5px;">Next wave starts in: <span id="shop-timer" style="color: #e74c3c; font-weight: bold;">30</span>s</p>
-            <button onclick="startWaveEarly()" style="background: #2980b9; padding: 8px 18px; font-size: 14px; margin-bottom: 12px;">⚡ Start Wave Early</button>
+            <div class="shop-header">
+                <h2>🛒 ARMORY & UPGRADES</h2>
+                <p style="font-size: 15px; color: #8a8a9e; margin-top: 6px;">Next wave starting in: <span id="shop-timer" style="color: var(--accent-red); font-weight: 800;">30</span>s</p>
+                <button onclick="startWaveEarly()" style="background: linear-gradient(135deg, #2980b9, #1f618d); padding: 8px 20px; font-size: 13px; margin-top: 4px;">⚡ Start Wave Now</button>
+            </div>
             
             <div class="shop-container">
-                <div class="shop-grid">
-                    <button onclick="buyItem('health')" onmouseover="showTip('Health Pack', 'Restores your HP back to maximum.', 'Instant', '50')" onmouseleave="clearTip()">Heal Full ($50)</button>
-                    <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases your total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP ($120)</button>
-                    <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently increases damage dealt by all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage ($100)</button>
-                    <button onclick="buyItem('speed')" onmouseover="showTip('Running Shoes', 'Increases your overall movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed ($75)</button>
-                    
-                    <button onclick="buyItem('shotgun')" style="background: #e67e22;" onmouseover="showTip('Shotgun', 'Fires a wide spread of 3 bullets per shot.', '22 Damage | Slow (0.9s)', '150')" onmouseleave="clearTip()">Shotgun (Marksman) ($150)</button>
-                    <button onclick="buyItem('minigun')" style="background: #c0392b;" onmouseover="showTip('Minigun', 'Rapidly fires heavy continuous rounds with large magazines.', '15 Damage | Very Fast (0.2s)', '250')" onmouseleave="clearTip()">Minigun (Marksman) ($250)</button>
-                    
-                    <button onclick="buyItem('fireStaff')" style="background: #8e44ad;" onmouseover="showTip('Fire Staff', 'Launches large explosive fire orbs that pierce through crowds.', '180 Damage | Slow (1.2s)', '160')" onmouseleave="clearTip()">Fire Staff (Mage) ($160)</button>
-                    <button onclick="buyItem('lightning')" style="background: #2980b9;" onmouseover="showTip('Lightning Rod', 'Fires rapid electric arcs with pinpoint precision.', '140 Damage | Medium (0.8s)', '260')" onmouseleave="clearTip()">Lightning (Mage) ($260)</button>
-                    
-                    <button onclick="buyItem('fireAx')" style="background: #d35400;" onmouseover="showTip('Fire Axe', 'Heavy close-range melee swing dealing devastating impact.', '240 Damage | Medium (0.6s)', '130')" onmouseleave="clearTip()">Fire Axe (Melee) ($130)</button>
-                    <button onclick="buyItem('katana')" style="background: #16a085;" onmouseover="showTip('Laser Katana', 'Lightning-fast blade slice paired with a mobility boost.', '320 Damage | Fast (0.3s)', '240')" onmouseleave="clearTip()">Laser Katana (Melee) ($240)</button>
-                    
-                    <button onclick="buyItem('mage')" style="background: #9b59b6;" onmouseover="showTip('Switch to Mage', 'Change class to Mage (uses mana and spell weapons).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Mage ($10,000)</button>
-                    <button onclick="buyItem('melee')" style="background: #95a5a6;" onmouseover="showTip('Switch to Melee', 'Change class to Melee bruiser (high HP & close quarters).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Melee ($10,000)</button>
-                    
-                    <button onclick="buyItem('marksman')" style="background: #f1c40f; color:#000;" onmouseover="showTip('Switch to Marksman', 'Change class to Marksman (ammo reload mechanics & guns).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Switch to Marksman ($10,000)</button>
-                    <button onclick="buyItem('megaWeapon')" style="background: #e74c3c; font-weight: bold;" onmouseover="showTip('MEGA WEAPON', 'Supreme devastation weapon with multi-directional blasts and built-in protective forcefield.', '2.5x Multiplier | Rapid Spread', '100,000')" onmouseleave="clearTip()">⚡ Mega Weapon ($100,000)</button>
+                <div class="shop-categories">
+                    <!-- Stat Upgrades -->
+                    <div>
+                        <div class="shop-section-title">Field Upgrades</div>
+                        <div class="shop-grid">
+                            <button onclick="buyItem('health')" onmouseover="showTip('Health Pack', 'Instantly restores your HP back to maximum.', 'Instant HP', '50')" onmouseleave="clearTip()">Heal Full <span class="price-badge">$50</span></button>
+                            <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP <span class="price-badge">$120</span></button>
+                            <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently boosts damage output across all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage <span class="price-badge">$100</span></button>
+                            <button onclick="buyItem('speed')" onmouseover="showTip('Tactical Boots', 'Increases base player movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed <span class="price-badge">$75</span></button>
+                        </div>
+                    </div>
+
+                    <!-- Arsenal Weapons -->
+                    <div>
+                        <div class="shop-section-title">Weaponry & Arcana</div>
+                        <div class="shop-grid">
+                            <button onclick="buyItem('shotgun')" onmouseover="showTip('Shotgun', 'Fires a wide spread of 3 bullets per shot.', '22 Dmg | Slow (0.9s)', '150')" onmouseleave="clearTip()">Shotgun <span class="price-badge">$150</span></button>
+                            <button onclick="buyItem('minigun')" onmouseover="showTip('Minigun', 'Heavy continuous bullet stream with massive capacity.', '15 Dmg | Fast (0.2s)', '250')" onmouseleave="clearTip()">Minigun <span class="price-badge">$250</span></button>
+                            <button onclick="buyItem('fireStaff')" onmouseover="showTip('Fire Staff', 'Launches large explosive orb blasts that pierce target lines.', '180 Dmg | Slow (1.2s)', '160')" onmouseleave="clearTip()">Fire Staff <span class="price-badge">$160</span></button>
+                            <button onclick="buyItem('lightning')" onmouseover="showTip('Lightning Rod', 'Fires rapid electrical bolts with pinpoint precision.', '140 Dmg | Med (0.8s)', '260')" onmouseleave="clearTip()">Lightning Rod <span class="price-badge">$260</span></button>
+                            <button onclick="buyItem('fireAx')" onmouseover="showTip('Fire Axe', 'Devastating high-impact heavy close-quarters melee swing.', '240 Dmg | Med (0.6s)', '130')" onmouseleave="clearTip()">Fire Axe <span class="price-badge">$130</span></button>
+                            <button onclick="buyItem('katana')" onmouseover="showTip('Laser Katana', 'Lightning-fast blade slice paired with passive agility boost.', '320 Dmg | Fast (0.3s)', '240')" onmouseleave="clearTip()">Laser Katana <span class="price-badge">$240</span></button>
+                        </div>
+                    </div>
+
+                    <!-- Class Swap & Ultimate -->
+                    <div>
+                        <div class="shop-section-title">Class Specs & Ultimate</div>
+                        <div class="shop-grid">
+                            <button onclick="buyItem('mage')" onmouseover="showTip('Switch to Mage', 'Re-spec into Mage (uses mana and powerful elemental staff spells).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Mage Class <span class="price-badge">$10k</span></button>
+                            <button onclick="buyItem('melee')" onmouseover="showTip('Switch to Melee', 'Re-spec into Melee bruiser (high HP & close quarters combat).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Melee Class <span class="price-badge">$10k</span></button>
+                            <button onclick="buyItem('marksman')" onmouseover="showTip('Switch to Marksman', 'Re-spec into Marksman (reloading mechanics & high speed firearms).', 'Base Stat Scaling', '10,000')" onmouseleave="clearTip()">Marksman Class <span class="price-badge">$10k</span></button>
+                            <button onclick="buyItem('megaWeapon')" style="background: rgba(231,76,60,0.2); border-color: var(--accent-red);" onmouseover="showTip('MEGA WEAPON', 'Supreme devastation weapon with 360° blasts & dynamic forcefield.', '2.5x Multiplier', '100,000')" onmouseleave="clearTip()">⚡ MEGA WEAPON <span class="price-badge" style="background:var(--accent-red); color:#fff;">$100k</span></button>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Hover Stat Tooltip Box -->
+                <!-- Hover Tooltip Box -->
                 <div id="tooltip-box">
                     <h4>Armory Intel</h4>
-                    <p id="tip-desc" style="color: #ccc; margin: 0 0 10px 0;">Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.</p>
-                    <div id="tip-stats" style="font-size: 13px; color: #f1c40f;"></div>
+                    <p id="tip-desc" style="color: #8a8a9e; font-size: 13px; margin: 0 0 12px 0; line-height: 1.4;">Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.</p>
+                    <div id="tip-stats" style="font-size: 13px; color: var(--accent-gold); font-weight: 600;"></div>
                 </div>
             </div>
         </div>
@@ -250,10 +482,10 @@
         <!-- Main Menu Screen -->
         <div id="main-menu" class="screen">
             <div class="menu-card">
-                <div class="menu-title">Zombie Survival</div>
-                <div class="menu-subtitle">Multiplayer Arena Battle</div>
+                <div class="menu-title">ZOMBIE ARENA</div>
+                <div class="menu-subtitle">Multiplayer Survival Wave Battle</div>
                 
-                <p style="font-size: 14px; color: #aaa; margin-bottom: 8px;">Select Your Emoji Avatar:</p>
+                <p style="font-size: 13px; color: #8a8a9e; margin-bottom: 8px; font-weight:700; text-transform:uppercase;">Select Avatar Symbol</p>
                 <div class="avatar-grid" id="avatar-selection">
                     <div class="avatar-btn selected" onclick="selectAvatar('🤠', this)">🤠</div>
                     <div class="avatar-btn" onclick="selectAvatar('🤖', this)">🤖</div>
@@ -263,42 +495,44 @@
                 </div>
 
                 <button onclick="createParty()" style="width: 100%; margin: 6px 0;">Create Party</button>
-                <div style="margin: 15px 0; color: #555; font-size: 13px;">— OR JOIN FRIEND —</div>
-                <input type="text" id="party-code-input" placeholder="Enter 4-Letter Code" maxlength="4" style="width: 80%; margin-bottom: 10px;">
+                <div style="margin: 15px 0; color: #555; font-size: 12px; font-weight: 700;">— OR JOIN PARTY —</div>
+                <input type="text" id="party-code-input" placeholder="Enter 4-Letter Code" maxlength="4" style="width: 80%; margin-bottom: 12px;">
                 <br>
                 <button onclick="joinParty()" style="width: 100%; margin: 6px 0; background: linear-gradient(135deg, #2980b9, #1f618d); box-shadow: 0 4px 15px rgba(41, 128, 185, 0.4);">Join Party</button>
-                <p id="error-msg" style="color: #e74c3c; margin-top: 10px; font-size: 14px;"></p>
+                <p id="error-msg" style="color: var(--accent-red); margin-top: 10px; font-size: 13px; font-weight: 600;"></p>
             </div>
         </div>
 
         <!-- Lobby Screen -->
         <div id="lobby-screen" class="screen hidden">
-            <div class="menu-card" style="max-width: 500px;">
-                <h2 id="party-code-display" style="margin-top: 0; color: #f1c40f;">Party Code: </h2>
-                <p style="color: #aaa; font-size: 14px;">Invite your teammate and choose your class below!</p>
-                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05);">
-                    <h4 style="margin: 0 0 10px 0; color: #ddd;">Players in Party:</h4>
+            <div class="menu-card" style="max-width: 480px;">
+                <h2 id="party-code-display" style="margin-top: 0; color: var(--accent-gold); font-size: 26px;">Party Code: </h2>
+                <p style="color: #8a8a9e; font-size: 14px; margin-bottom: 20px;">Share your party code and pick your class class!</p>
+                
+                <div style="background: rgba(0,0,0,0.3); padding: 16px; border-radius: 14px; margin-bottom: 20px; border: 1px solid var(--panel-border);">
+                    <h4 style="margin: 0 0 10px 0; color: #ddd; font-size: 13px; text-transform:uppercase;">Players in Lobby:</h4>
                     <ul id="player-list" style="list-style: none; padding: 0; margin: 0; font-size: 14px; color: #bbb;"></ul>
                 </div>
-                <h3 style="font-size: 16px; margin-bottom: 10px;">Choose Your Class:</h3>
+                
+                <h3 style="font-size: 14px; margin-bottom: 10px; text-transform: uppercase; color:#8a8a9e;">Choose Class:</h3>
                 <div style="display: flex; justify-content: center; gap: 10px;">
-                    <button onclick="selectClass('mage')" style="background: #9b59b6; margin: 0; flex: 1;">Mage</button>
-                    <button onclick="selectClass('melee')" style="background: #95a5a6; margin: 0; flex: 1;">Melee</button>
-                    <button onclick="selectClass('marksman')" style="background: #f1c40f; color: #000; margin: 0; flex: 1;">Marksman</button>
+                    <button onclick="selectClass('mage')" style="background: var(--accent-purple); margin: 0; flex: 1;">Mage</button>
+                    <button onclick="selectClass('melee')" style="background: #7f8c8d; margin: 0; flex: 1;">Melee</button>
+                    <button onclick="selectClass('marksman')" style="background: var(--accent-gold); color: #000; margin: 0; flex: 1;">Marksman</button>
                 </div>
                 <br>
                 <button id="start-game-btn" onclick="startGame()" class="hidden" style="width: 100%; background: linear-gradient(135deg, #e67e22, #d35400); margin-top: 10px;">Start Game</button>
                 <br>
-                <button onclick="goToMainMenu()" style="width: 100%; background: rgba(255,255,255,0.1); box-shadow: none; font-size: 14px; margin-top: 5px;">Main Menu</button>
+                <button onclick="goToMainMenu()" style="width: 100%; background: rgba(255,255,255,0.08); box-shadow: none; font-size: 14px; margin-top: 5px;">Leave Lobby</button>
             </div>
         </div>
 
         <!-- Death Screen -->
         <div id="death-screen" class="screen hidden">
-            <h2 style="color: #e74c3c; font-size: 48px; margin-bottom: 5px; text-shadow: 0 0 20px rgba(231,76,60,0.5);">YOU DIED</h2>
-            <p style="color: #bbb; font-size: 20px; margin-bottom: 20px;">The horde overwhelmed your defenses.</p>
-            <button onclick="respawnPlayer()" style="background: linear-gradient(135deg, #e67e22, #d35400); font-size: 20px; box-shadow: 0 4px 20px rgba(230,126,34,0.6);">Respawn</button>
-            <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); box-shadow: none; font-size: 16px; margin-top: 15px;">Main Menu</button>
+            <h2 style="color: var(--accent-red); font-size: 52px; margin-bottom: 5px; text-shadow: 0 0 30px rgba(231,76,60,0.6); font-weight: 900;">YOU DIED</h2>
+            <p style="color: #aaa; font-size: 18px; margin-bottom: 25px;">The horde overwhelmed your defenses.</p>
+            <button onclick="respawnPlayer()" style="background: linear-gradient(135deg, #e67e22, #d35400); font-size: 18px; box-shadow: 0 4px 20px rgba(230,126,34,0.6); padding: 14px 32px;">Respawn</button>
+            <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); box-shadow: none; font-size: 15px; margin-top: 15px;">Main Menu</button>
         </div>
     </div>
 
@@ -317,6 +551,7 @@
         const errorMsg = document.getElementById('error-msg');
         const startGameBtn = document.getElementById('start-game-btn');
         const extraStat = document.getElementById('extra-stat');
+        const vignette = document.getElementById('vignette');
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -330,11 +565,44 @@
 
         let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], speechBubbles: [], wave: 1, waveActive: false, shopTimer: 30 };
         let selectedAvatarSymbol = '🤠';
-        let isDead = false; // FIX 8: guard so death screen doesn't flicker every stateUpdate
+        let isDead = false;
 
-        // Auto-join from URL param - runs after socket.on handlers are registered so events are caught
+        // Client Juiciness Systems: Particles, Floating Texts & Camera Shake
+        let particles = [];
+        let floatingTexts = [];
+        let cameraShake = 0;
+        let lastHp = {};
+        let lastZombieCount = 0;
+
+        function addParticle(x, y, color, count = 5, speed = 4) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const spd = Math.random() * speed + 1;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * spd,
+                    vy: Math.sin(angle) * spd,
+                    color,
+                    size: Math.random() * 4 + 2,
+                    life: 20 + Math.random() * 10
+                });
+            }
+        }
+
+        function addFloatingText(x, y, text, color = '#f1c40f') {
+            floatingTexts.push({
+                x, y,
+                text,
+                color,
+                vy: -1.5,
+                alpha: 1.0,
+                life: 40
+            });
+        }
+
+        // Auto-join from URL param
         socket.on('connect', function onFirstConnect() {
-            socket.off('connect', onFirstConnect); // one-shot, remove after first fire
+            socket.off('connect', onFirstConnect);
             const urlParams = new URLSearchParams(window.location.search);
             const roomCode = urlParams.get('room');
             if (roomCode) {
@@ -357,7 +625,6 @@
         function respawnPlayer() { socket.emit('respawn'); }
         function buyItem(item) { socket.emit('buy', item); }
         function goToMainMenu() { 
-            // Clear search params from URL when returning to main menu
             window.history.replaceState({}, document.title, window.location.pathname);
             location.reload(); 
         }
@@ -380,7 +647,6 @@
             startGameBtn.classList.remove('hidden');
             socket.emit('selectAvatar', selectedAvatarSymbol);
 
-            // Update browser URL query parameter with party code automatically for easy sharing
             const newUrl = `${window.location.pathname}?room=${code}`;
             window.history.replaceState({ room: code }, '', newUrl);
         });
@@ -391,7 +657,6 @@
             partyCodeDisplay.innerText = `Party Code: ${code}`;
             socket.emit('selectAvatar', selectedAvatarSymbol);
 
-            // Update browser URL query parameter with room code
             const newUrl = `${window.location.pathname}?room=${code}`;
             window.history.replaceState({ room: code }, '', newUrl);
         });
@@ -403,8 +668,8 @@
             for (let id in players) {
                 let p = players[id];
                 let li = document.createElement('li');
-                li.style.padding = '4px 0';
-                li.innerText = `${p.avatar || '🤠'} Player (${id === socket.id ? 'You' : 'Friend'}) — Class: ${p.class.toUpperCase()}`;
+                li.style.padding = '6px 0';
+                li.innerText = `${p.avatar || '🤠'} Player (${id === socket.id ? 'You' : 'Teammate'}) — Class: ${p.class.toUpperCase()}`;
                 playerList.appendChild(li);
             }
         });
@@ -416,6 +681,12 @@
         });
 
         socket.on('stateUpdate', (state) => {
+            // Screen shake trigger on explosion
+            if (state.explosions && state.explosions.length > gameState.explosions.length) {
+                cameraShake = 12;
+                state.explosions.forEach(ex => addParticle(ex.x, ex.y, '#e74c3c', 25, 8));
+            }
+
             gameState = state;
 
             document.getElementById('wave-display').innerText = gameState.wave;
@@ -429,14 +700,31 @@
             if (me) {
                 document.getElementById('money-display').innerText = me.money;
                 document.getElementById('hp-display').innerText = `${Math.max(0, Math.ceil(me.hp))}/${me.maxHp}`;
+                
+                // Dynamic Health Bar Width
+                let hpPercent = Math.max(0, (me.hp / me.maxHp) * 100);
+                document.getElementById('hp-bar').style.width = `${hpPercent}%`;
 
-                // FIX 8: only trigger death screen once, not every stateUpdate tick
+                // Vignette update
+                if (hpPercent < 30 && me.hp > 0) {
+                    vignette.classList.add('critical');
+                } else {
+                    vignette.classList.remove('critical');
+                }
+
+                // Check hit particles & floating damage text on local player
+                if (lastHp[socket.id] !== undefined && me.hp < lastHp[socket.id]) {
+                    const dmgTaken = Math.round(lastHp[socket.id] - me.hp);
+                    addFloatingText(me.x + me.size/2, me.y, `-${dmgTaken}`, '#e74c3c');
+                    addParticle(me.x + me.size/2, me.y + me.size/2, '#e74c3c', 8, 4);
+                }
+                lastHp[socket.id] = me.hp;
+
                 if (me.hp <= 0 && !isDead) {
                     isDead = true;
                     deathScreen.classList.remove('hidden');
                     inGameMenuBtn.classList.add('hidden');
                 } else if (me.hp > 0 && isDead) {
-                    // Player respawned
                     isDead = false;
                     deathScreen.classList.add('hidden');
                     inGameMenuBtn.classList.remove('hidden');
@@ -444,16 +732,15 @@
 
                 let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
                 let statusText = ``;
-                // FIX 11: show dash cooldown in seconds (30 ticks/sec), not raw frames
                 if (me.dashCooldown > 0) statusText += ` | Dash: ${(me.dashCooldown / 30).toFixed(1)}s`;
                 if (me.powerUpType) statusText += ` | [⚡ ${me.powerUpType.toUpperCase()}]`;
 
                 if (me.class === 'marksman' && me.weaponType !== 'megaWeapon') {
-                    extraStat.innerText = me.reloading ? `| [${weaponName}] Auto-Reloading...` : `| [${weaponName}] Ammo: ${me.ammo}/${me.maxAmmo} ${statusText}`;
+                    extraStat.innerText = me.reloading ? `[${weaponName}] Reloading...` : `[${weaponName}] ${me.ammo}/${me.maxAmmo} Ammo ${statusText}`;
                 } else if (me.class === 'mage' && me.weaponType !== 'megaWeapon') {
-                    extraStat.innerText = `| [${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana} ${statusText}`;
+                    extraStat.innerText = `[${weaponName}] Mana: ${Math.floor(me.mana)}/${me.maxMana} ${statusText}`;
                 } else {
-                    extraStat.innerText = `| [${weaponName}] ${statusText}`;
+                    extraStat.innerText = `[${weaponName}] ${statusText}`;
                 }
             }
 
@@ -469,8 +756,11 @@
             keys[e.key.toLowerCase()] = true; 
             if (e.code === 'Space') {
                 e.preventDefault();
-                // FIX 6b: don't send dash while lobby or shop is open
                 if (lobbyScreen.classList.contains('hidden') && shop.classList.contains('hidden')) {
+                    const me = gameState.players[socket.id];
+                    if (me && me.dashCooldown === 0) {
+                        addParticle(me.x + me.size/2, me.y + me.size/2, '#3498db', 12, 5);
+                    }
                     socket.emit('move', {
                         up: keys['w'] || keys['arrowup'],
                         down: keys['s'] || keys['arrowdown'],
@@ -484,7 +774,6 @@
         window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
         setInterval(() => {
-            // FIX 6: don't send move events when lobby or shop is visible
             if (!lobbyScreen.classList.contains('hidden')) return;
             if (!shop.classList.contains('hidden')) return;
             socket.emit('move', {
@@ -496,7 +785,6 @@
             });
         }, 1000 / 30);
 
-        // FIX 7: hold mouse to auto-fire instead of single click only
         let mouseDown = false;
         let lastMousePos = { x: 0, y: 0 };
 
@@ -519,7 +807,6 @@
         canvas.addEventListener('mouseup', () => { mouseDown = false; });
         canvas.addEventListener('mouseleave', () => { mouseDown = false; });
 
-        // Auto-fire interval while mouse is held (100ms so it doesn't spam too fast)
         setInterval(() => {
             if (!mouseDown) return;
             if (!lobbyScreen.classList.contains('hidden')) return;
@@ -536,8 +823,16 @@
 
             if (lobbyScreen.classList.contains('hidden')) {
                 const me = gameState.players[socket.id];
-                const camX = me ? me.x - canvas.width / 2 : 0;
-                const camY = me ? me.y - canvas.height / 2 : 0;
+                let camX = me ? me.x - canvas.width / 2 : 0;
+                let camY = me ? me.y - canvas.height / 2 : 0;
+
+                // Shake effect offset
+                if (cameraShake > 0) {
+                    camX += (Math.random() - 0.5) * cameraShake;
+                    camY += (Math.random() - 0.5) * cameraShake;
+                    cameraShake *= 0.85;
+                    if (cameraShake < 0.5) cameraShake = 0;
+                }
 
                 ctx.save();
                 ctx.translate(-camX, -camY);
@@ -567,6 +862,7 @@
                 ctx.arc(1000, 1000, 950, 0, Math.PI * 2);
                 ctx.stroke();
 
+                // Draw Barrels
                 if (gameState.barrels) {
                     gameState.barrels.forEach(barrel => {
                         ctx.font = '32px Arial';
@@ -576,6 +872,7 @@
                     });
                 }
 
+                // Explosions
                 if (gameState.explosions) {
                     gameState.explosions.forEach(ex => {
                         ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
@@ -586,6 +883,7 @@
                     });
                 }
 
+                // Pickups (Nuka removed, standard drops drawn cleanly)
                 gameState.pickups.forEach(p => {
                     ctx.font = '32px Arial';
                     ctx.textAlign = 'center';
@@ -596,13 +894,18 @@
                     ctx.fillText(icon, p.x, p.y);
                 });
 
-                ctx.fillStyle = '#f39c12';
+                // Bullets with Glow
                 gameState.bullets.forEach(b => {
+                    ctx.fillStyle = '#f39c12';
+                    ctx.shadowColor = '#f39c12';
+                    ctx.shadowBlur = 8;
                     ctx.beginPath();
                     ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
                     ctx.fill();
+                    ctx.shadowBlur = 0; // reset
                 });
 
+                // Zombies
                 gameState.zombies.forEach(z => {
                     ctx.font = `${z.size * 1.2}px Arial`;
                     ctx.textAlign = 'center';
@@ -623,18 +926,22 @@
                     ctx.fillRect(z.x, z.y - 12, z.size, 5);
                     ctx.fillStyle = '#00ff00';
                     ctx.fillRect(z.x, z.y - 12, z.size * Math.max(0, (z.hp / z.maxHp)), 5);
-                    ctx.fillStyle = '#f39c12'; // FIX 10: reset fillStyle so bullets don't inherit HP bar colour
+                    ctx.fillStyle = '#f39c12';
                 });
 
+                // Players
                 for (let id in gameState.players) {
                     let p = gameState.players[id];
                     if (p.hp > 0) {
                         if (p.hasForceField) {
                             ctx.strokeStyle = '#3498db';
+                            ctx.shadowColor = '#3498db';
+                            ctx.shadowBlur = 12;
                             ctx.lineWidth = 4;
                             ctx.beginPath();
                             ctx.arc(p.x + p.size/2, p.y + p.size/2, p.size * 1.5, 0, Math.PI * 2);
                             ctx.stroke();
+                            ctx.shadowBlur = 0;
                         }
 
                         ctx.font = `${p.size * 1.2}px Arial`;
@@ -646,10 +953,36 @@
                         ctx.fillRect(p.x, p.y - 15, p.size, 5);
                         ctx.fillStyle = '#00ff00';
                         ctx.fillRect(p.x, p.y - 15, p.size * Math.max(0, (p.hp / p.maxHp)), 5);
-                        ctx.fillStyle = '#f39c12'; // reset after HP bar
+                        ctx.fillStyle = '#f39c12';
                     }
                 }
 
+                // Render Visual Particle Effects
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    let pt = particles[i];
+                    pt.x += pt.vx;
+                    pt.y += pt.vy;
+                    pt.life--;
+                    ctx.fillStyle = pt.color;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    if (pt.life <= 0) particles.splice(i, 1);
+                }
+
+                // Render Floating Combat Text
+                for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                    let ft = floatingTexts[i];
+                    ft.y += ft.vy;
+                    ft.life--;
+                    ctx.font = '900 16px Segoe UI, sans-serif';
+                    ctx.fillStyle = ft.color;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    if (ft.life <= 0) floatingTexts.splice(i, 1);
+                }
+
+                // Speech Bubbles
                 if (gameState.speechBubbles) {
                     gameState.speechBubbles.forEach(sb => {
                         ctx.font = 'bold 14px Arial';
