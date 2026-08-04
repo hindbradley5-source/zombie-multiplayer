@@ -92,6 +92,7 @@ function createRoomObject(isBossRush = false) {
         barrels: [],
         explosions: [],
         speechBubbles: [],
+        damageTexts: [],
         fireTrails: [],
         acidPools: [],
         wave: 1,
@@ -203,6 +204,14 @@ io.on('connection', (socket) => {
             socket.roomCode = null;
         }
         socket.emit('leftRoom');
+    });
+
+    socket.on('sendPing', (msg) => {
+        const room = rooms[socket.roomCode];
+        if (!room) return;
+        const p = room.players[socket.id];
+        if (!p || p.hp <= 0) return;
+        io.to(socket.roomCode).emit('killstreak', { player: p.name, title: `💬 "${msg}"` });
     });
 
     socket.on('createParty', (pName) => {
@@ -347,6 +356,7 @@ io.on('connection', (socket) => {
                 room.explosions.push({ x: z.x + z.size/2, y: z.y + z.size/2, radius: 180, life: 25, isHoly: true });
                 z.hp -= 950;
                 p.totalDamage += 950;
+                room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-950 CRIT', color: '#f1c40f', life: 40 });
             });
         } else if (p.class === 'marksman') { // NIGHTHAWK BARRAGE
             io.to(socket.roomCode).emit('killstreak', { player: p.name, title: '🚀 NIGHTHAWK BARRAGE!' });
@@ -362,6 +372,7 @@ io.on('connection', (socket) => {
                     z.frozenTimer = 180;
                     z.hp -= 800;
                     p.totalDamage += 800;
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-800', color: '#38bdf8', life: 40 });
                 }
             });
         } else if (p.class === 'melee') { // BLADE TORNADO
@@ -373,6 +384,7 @@ io.on('connection', (socket) => {
                 if (Math.hypot((z.x + z.size/2) - pX, (z.y + z.size/2) - pY) < 350) {
                     z.hp -= 1200;
                     p.totalDamage += 1200;
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-1200 CRIT', color: '#ef4444', life: 40 });
                 }
             });
         } else if (p.class === 'necromancer') { // ARMY OF THE DEAD
@@ -467,6 +479,7 @@ io.on('connection', (socket) => {
                 if (Math.hypot((z.x + z.size/2) - pX, (z.y + z.size/2) - pY) < 240) {
                     z.hp -= 320;
                     p.totalDamage += 320;
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-320', color: '#f1c40f', life: 30 });
                 }
             });
         } else if (p.class === 'marksman') {
@@ -490,6 +503,7 @@ io.on('connection', (socket) => {
                     if (Math.hypot((z.x + z.size/2) - targetX, (z.y + z.size/2) - targetY) < 180) {
                         z.hp -= 450;
                         p.totalDamage += 450;
+                        r.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-450', color: '#ef4444', life: 30 });
                     }
                 });
             }, 400);
@@ -503,6 +517,7 @@ io.on('connection', (socket) => {
                     z.frozenTimer = 90;
                     z.hp -= 150;
                     p.totalDamage += 150;
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-150 FROZE', color: '#38bdf8', life: 30 });
                 }
             });
         } else if (p.class === 'melee') {
@@ -515,6 +530,7 @@ io.on('connection', (socket) => {
                 if (dist < 160) {
                     z.hp -= 380;
                     p.totalDamage += 380;
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: '-380', color: '#ef4444', life: 30 });
                     const angle = Math.atan2((z.y + z.size/2) - pY, (z.x + z.size/2) - pX);
                     z.x += Math.cos(angle) * 80;
                     z.y += Math.sin(angle) * 80;
@@ -601,6 +617,7 @@ io.on('connection', (socket) => {
                     z.frozenTimer = 120;
                     z.hp -= finalDamage;
                     p.totalDamage += Math.round(finalDamage);
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: `-${Math.round(finalDamage)}`, color: '#38bdf8', life: 25 });
                 }
             });
             return;
@@ -615,8 +632,10 @@ io.on('connection', (socket) => {
                 const zX = z.x + z.size / 2;
                 const zY = z.y + z.size / 2;
                 if (Math.hypot(zX - pX, zY - pY) <= 160) {
-                    z.hp -= finalDamage * 1.5;
-                    p.totalDamage += Math.round(finalDamage * 1.5);
+                    const dmg = finalDamage * 1.5;
+                    z.hp -= dmg;
+                    p.totalDamage += Math.round(dmg);
+                    room.damageTexts.push({ x: zX, y: zY, text: `-${Math.round(dmg)}`, color: '#f1c40f', life: 25 });
                     p.hp = Math.min(p.maxHp, p.hp + 2);
                 }
             });
@@ -653,6 +672,7 @@ io.on('connection', (socket) => {
                     if (diff <= Math.PI / 3) {
                         z.hp -= finalDamage;
                         p.totalDamage += Math.round(finalDamage);
+                        room.damageTexts.push({ x: zX, y: zY, text: `-${Math.round(finalDamage)}`, color: '#ef4444', life: 25 });
                         z.x += Math.cos(angleToZ) * 45;
                         z.y += Math.sin(angleToZ) * 45;
 
@@ -694,6 +714,7 @@ io.on('connection', (socket) => {
                     if (diff <= 0.3) {
                         z.hp -= finalDamage;
                         p.totalDamage += Math.round(finalDamage);
+                        room.damageTexts.push({ x: zX, y: zY, text: `-${Math.round(finalDamage)}`, color: '#38bdf8', life: 25 });
                     }
                 }
             });
@@ -868,6 +889,7 @@ setInterval(() => {
                 size: 44,
                 fallY: -200
             });
+            io.to(code).emit('killstreak', { player: '📦', title: 'AIR-DROP SUPPLY CRATE ARRIVED!' });
         }
 
         room.supplyCrates.forEach(c => {
@@ -1127,6 +1149,7 @@ setInterval(() => {
                 if (b.markedForDeletion) return;
                 if (b.x > z.x && b.x < z.x + z.size && b.y > z.y && b.y < z.y + z.size) {
                     z.hp -= b.damage;
+                    room.damageTexts.push({ x: z.x + z.size/2, y: z.y, text: `-${Math.round(b.damage)}`, color: '#f1c40f', life: 25 });
                     if (b.pierce) {
                         b.pierce--;
                         if (b.pierce <= 0) b.markedForDeletion = true;
@@ -1143,6 +1166,7 @@ setInterval(() => {
                             if (otherZ !== z && chainHits < 3 && Math.hypot(otherZ.x - z.x, otherZ.y - z.y) < 180) {
                                 otherZ.hp -= 90;
                                 shooter.totalDamage += 90;
+                                room.damageTexts.push({ x: otherZ.x + otherZ.size/2, y: otherZ.y, text: '-90 ⚡', color: '#38bdf8', life: 25 });
                                 chainHits++;
                             }
                         });
@@ -1214,6 +1238,10 @@ setInterval(() => {
                 return true;
             });
         }
+
+        room.damageTexts = room.damageTexts || [];
+        room.damageTexts.forEach(dt => { dt.y -= 0.6; dt.life--; });
+        room.damageTexts = room.damageTexts.filter(dt => dt.life > 0);
 
         room.slashArcs = room.slashArcs || [];
         room.slashArcs.forEach(sa => sa.life--);
@@ -1287,6 +1315,8 @@ setInterval(() => {
             }
         }
 
+        let bossZombie = room.zombies.find(z => z.type === 'boss');
+
         io.to(code).emit('stateUpdate', {
             players: room.players,
             bullets: room.bullets,
@@ -1302,16 +1332,19 @@ setInterval(() => {
             barrels: room.barrels,
             explosions: room.explosions,
             speechBubbles: room.speechBubbles,
+            damageTexts: room.damageTexts,
             fireTrails: room.fireTrails,
             acidPools: room.acidPools,
             slashArcs: room.slashArcs,
             lightningBeams: room.lightningBeams,
             wave: room.wave,
             waveActive: room.waveActive,
+            zombiesRemaining: room.zombies.length + room.zombiesToSpawn,
             shopTimer: Math.ceil(room.shopTimer),
             gameOver: room.gameOver,
             environmentalEvent: room.environmentalEvent,
-            isBossRush: room.isBossRush
+            isBossRush: room.isBossRush,
+            bossHpRatio: bossZombie ? (bossZombie.hp / bossZombie.maxHp) : null
         });
     }
 }, 1000 / 30);
