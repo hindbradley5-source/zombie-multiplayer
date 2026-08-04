@@ -6,16 +6,18 @@ const io = require('socket.io')(http);
 app.use(express.static('public'));
 
 const rooms = {};
+const leaderboard = [];
 
-const ARENA_CENTER_X = 1000;
-const ARENA_CENTER_Y = 1000;
-const ARENA_RADIUS = 950;
+const ARENA_CENTER_X = 1600;
+const ARENA_CENTER_Y = 1600;
+const ARENA_RADIUS = 1550;
 
 const classData = {
     mage:        { color: '#9b59b6', speed: 5.5, maxHp: 120, bulletSpeed: 9,  bulletSize: 18, damage: 110, mana: 120, maxMana: 120, manaCost: 12, weaponType: 'orb',       attackSpeed: 'Slow (1.2s)'     },
     melee:       { color: '#95a5a6', speed: 7,   maxHp: 220, bulletSpeed: 18, bulletSize: 12, damage: 160,                                                                  weaponType: 'dagger',    attackSpeed: 'Fast (0.4s)'  },
     marksman:    { color: '#f1c40f', speed: 5,   maxHp: 100, bulletSpeed: 20, bulletSize: 4,  damage: 30,  ammo: 15, maxAmmo: 15, weaponType: 'pistol', reloading: false, attackSpeed: 'Medium (0.6s)'   },
-    necromancer: { color: '#2ecc71', speed: 5.2, maxHp: 110, bulletSpeed: 12, bulletSize: 14, damage: 95,  mana: 140, maxMana: 140, manaCost: 15, weaponType: 'shadowOrb', attackSpeed: 'Medium (0.8s)'   }
+    necromancer: { color: '#2ecc71', speed: 5.2, maxHp: 110, bulletSpeed: 12, bulletSize: 14, damage: 95,  mana: 140, maxMana: 140, manaCost: 15, weaponType: 'shadowOrb', attackSpeed: 'Medium (0.8s)'   },
+    paladin:     { color: '#e67e22', speed: 4.8, maxHp: 260, bulletSpeed: 16, bulletSize: 14, damage: 140,                                                                  weaponType: 'hammer',    attackSpeed: 'Medium (0.6s)'   }
 };
 
 const perkPool = [
@@ -49,7 +51,7 @@ function makePlayer(stats, x, y) {
     return {
         x, y,
         aimAngle: 0,
-        size: 35,
+        size: 38,
         hp: stats.maxHp,
         money: 0,
         moneyGainMultiplier: 1.0,
@@ -83,6 +85,7 @@ function createRoomObject(isBossRush = false) {
         reviveBeacons: [],
         orbitalStrikes: [],
         bloodSplatters: [],
+        supplyCrates: [],
         pickups: [],
         barrels: [],
         explosions: [],
@@ -90,8 +93,8 @@ function createRoomObject(isBossRush = false) {
         fireTrails: [],
         acidPools: [],
         wave: 1,
-        zombiesToSpawn: isBossRush ? 2 : 5,
-        totalZombiesThisWave: isBossRush ? 2 : 5,
+        zombiesToSpawn: isBossRush ? 3 : 8,
+        totalZombiesThisWave: isBossRush ? 3 : 8,
         waveActive: true,
         gameStarted: true,
         bossSpawnedThisWave: false,
@@ -100,12 +103,21 @@ function createRoomObject(isBossRush = false) {
         gameOver: false,
         perkPhaseActive: false,
         environmentalEvent: isBossRush ? 'bloodMoon' : null,
-        isBossRush
+        isBossRush,
+        crateTimer: 0
     };
+}
+
+function updateLeaderboard(name, wave, kills) {
+    leaderboard.push({ name: name || 'Survivor', wave, kills, date: new Date().toLocaleDateString() });
+    leaderboard.sort((a, b) => b.wave !== a.wave ? b.wave - a.wave : b.kills - a.kills);
+    if (leaderboard.length > 10) leaderboard.pop();
 }
 
 io.on('connection', (socket) => {
     console.log('A player connected:', socket.id);
+
+    socket.emit('leaderboardUpdate', leaderboard);
 
     socket.on('startSoloGame', (playerClass) => {
         const code = 'SOLO_' + Math.floor(1000 + Math.random() * 9000);
@@ -119,9 +131,9 @@ io.on('connection', (socket) => {
         rooms[code].players[socket.id].class = pClass;
         rooms[code].players[socket.id].baseClass = pClass;
 
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 10; i++) {
             let angle = Math.random() * Math.PI * 2;
-            let dist  = Math.random() * (ARENA_RADIUS - 200);
+            let dist  = Math.random() * (ARENA_RADIUS - 300);
             rooms[code].barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
         }
 
@@ -140,11 +152,11 @@ io.on('connection', (socket) => {
         rooms[code].players[socket.id] = makePlayer(stats, ARENA_CENTER_X, ARENA_CENTER_Y);
         rooms[code].players[socket.id].class = pClass;
         rooms[code].players[socket.id].baseClass = pClass;
-        rooms[code].players[socket.id].money = 500;
+        rooms[code].players[socket.id].money = 600;
 
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 10; i++) {
             let angle = Math.random() * Math.PI * 2;
-            let dist  = Math.random() * (ARENA_RADIUS - 200);
+            let dist  = Math.random() * (ARENA_RADIUS - 300);
             rooms[code].barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
         }
 
@@ -162,9 +174,9 @@ io.on('connection', (socket) => {
 
         rooms[code].players[socket.id] = makePlayer(classData['marksman'], ARENA_CENTER_X, ARENA_CENTER_Y);
 
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 10; i++) {
             let angle = Math.random() * Math.PI * 2;
-            let dist  = Math.random() * (ARENA_RADIUS - 200);
+            let dist  = Math.random() * (ARENA_RADIUS - 300);
             rooms[code].barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
         }
 
@@ -217,7 +229,7 @@ io.on('connection', (socket) => {
         room.gameStarted = true;
         room.waveActive = true;
         room.wave = 1;
-        room.zombiesToSpawn = room.isBossRush ? 2 : 5;
+        room.zombiesToSpawn = room.isBossRush ? 3 : 8;
         room.totalZombiesThisWave = room.zombiesToSpawn;
         room.waveClearHandled = false;
         room.gameOver = false;
@@ -249,8 +261,8 @@ io.on('connection', (socket) => {
             id: 'turret_' + Date.now() + '_' + Math.random(),
             x: p.x + p.size/2,
             y: p.y + p.size/2,
-            hp: 250,
-            maxHp: 250,
+            hp: 300,
+            maxHp: 300,
             fireTimer: 0,
             owner: socket.id
         });
@@ -267,8 +279,8 @@ io.on('connection', (socket) => {
             x: p.x + p.size/2 - 25,
             y: p.y + p.size/2 - 25,
             size: 50,
-            hp: 400,
-            maxHp: 400
+            hp: 500,
+            maxHp: 500
         });
     });
 
@@ -295,8 +307,8 @@ io.on('connection', (socket) => {
                 const len = Math.hypot(dx, dy);
                 const startX = p.x + p.size/2;
                 const startY = p.y + p.size/2;
-                p.x += (dx / len) * 140;
-                p.y += (dy / len) * 140;
+                p.x += (dx / len) * 150;
+                p.y += (dy / len) * 150;
                 p.dashCooldown = 45;
 
                 if (p.perks.includes('fireDash')) {
@@ -340,10 +352,23 @@ io.on('connection', (socket) => {
         const p = room.players[socket.id];
         if (!p || p.hp <= 0 || p.skillCooldown > 0) return;
 
-        if (p.class === 'marksman') {
+        if (p.class === 'paladin') {
+            p.skillCooldown = 360;
+            p.hasForceField = true;
+            setTimeout(() => { if (p) p.hasForceField = false; }, 5000);
+            const pX = p.x + p.size / 2;
+            const pY = p.y + p.size / 2;
+            room.explosions.push({ x: pX, y: pY, radius: 240, life: 16, isHoly: true });
+            room.zombies.forEach(z => {
+                if (Math.hypot((z.x + z.size/2) - pX, (z.y + z.size/2) - pY) < 240) {
+                    z.hp -= 320;
+                    p.totalDamage += 320;
+                }
+            });
+        } else if (p.class === 'marksman') {
             p.skillCooldown = 300;
             const angle = Math.atan2(target.y - (p.y + p.size/2), target.x - (p.x + p.size/2));
-            const dist = Math.min(400, Math.hypot(target.x - (p.x + p.size/2), target.y - (p.y + p.size/2)));
+            const dist = Math.min(450, Math.hypot(target.x - (p.x + p.size/2), target.y - (p.y + p.size/2)));
             const targetX = p.x + p.size/2 + Math.cos(angle) * dist;
             const targetY = p.y + p.size/2 + Math.sin(angle) * dist;
             
@@ -423,13 +448,14 @@ io.on('connection', (socket) => {
         const weaponCooldowns = {
             pistol: 400, shotgun: 750, minigun: 160, fireStaff: 850,
             lightning: 600, fireAx: 550, katana: 350, shadowOrb: 450,
-            scythe: 400, megaWeapon: 300
+            scythe: 400, lichStaff: 350, hammer: 550, warMace: 480, thunderHammer: 420,
+            flamethrower: 100, freezeRay: 300, megaWeapon: 300
         };
         const cd = weaponCooldowns[p.weaponType] || 400;
         if (nowTime - (p.lastShotTime || 0) < cd) return;
         p.lastShotTime = nowTime;
 
-        if (p.class === 'marksman' && p.weaponType !== 'megaWeapon') {
+        if (p.class === 'marksman' && !['flamethrower','freezeRay','megaWeapon'].includes(p.weaponType)) {
             let reloadTime = p.weaponType === 'shotgun' ? 900 : p.weaponType === 'minigun' ? 200 : 500;
             if (p.ammo <= 0) {
                 p.reloading = true;
@@ -441,7 +467,7 @@ io.on('connection', (socket) => {
                 p.reloading = true;
                 setTimeout(() => { if (room.players[socket.id]) { room.players[socket.id].ammo = room.players[socket.id].maxAmmo; room.players[socket.id].reloading = false; } }, reloadTime);
             }
-        } else if ((p.class === 'mage' || p.class === 'necromancer') && p.weaponType !== 'megaWeapon') {
+        } else if ((p.class === 'mage' || p.class === 'necromancer') && !['flamethrower','freezeRay','megaWeapon'].includes(p.weaponType)) {
             if (p.mana < p.manaCost) return;
             p.mana -= p.manaCost;
         }
@@ -449,10 +475,67 @@ io.on('connection', (socket) => {
         const baseAngle = Math.atan2(target.y - (p.y + p.size / 2), target.x - (p.x + p.size / 2));
         const finalDamage = p.damage * (p.powerUpType === 'doubleDamage' ? 2 : 1);
 
-        if ((p.class === 'melee' || p.weaponType === 'scythe') && p.weaponType !== 'megaWeapon') {
+        if (p.weaponType === 'flamethrower') {
+            for (let i = -1; i <= 1; i++) {
+                const angle = baseAngle + (i * 0.12);
+                room.bullets.push({
+                    x: p.x + p.size / 2, y: p.y + p.size / 2,
+                    dx: Math.cos(angle), dy: Math.sin(angle),
+                    speed: 12, size: 18, damage: finalDamage * 0.4,
+                    owner: socket.id, life: 25, isFlame: true
+                });
+            }
+            return;
+        }
+
+        if (p.weaponType === 'freezeRay') {
             const pX = p.x + p.size / 2;
             const pY = p.y + p.size / 2;
-            const range = p.weaponType === 'katana' ? 140 : p.weaponType === 'scythe' ? 150 : 100;
+            room.explosions.push({ x: pX, y: pY, radius: 320, life: 14, isFreezeBeam: true });
+            room.zombies.forEach(z => {
+                if (Math.hypot((z.x + z.size/2) - pX, (z.y + z.size/2) - pY) < 320) {
+                    z.frozenTimer = 120;
+                    z.hp -= finalDamage;
+                    p.totalDamage += Math.round(finalDamage);
+                }
+            });
+            return;
+        }
+
+        if (p.weaponType === 'thunderHammer') {
+            const pX = p.x + p.size / 2;
+            const pY = p.y + p.size / 2;
+            room.slashArcs.push({ x: pX, y: pY, angle: baseAngle, range: 160, weapon: 'thunderHammer', life: 8, owner: socket.id });
+            room.explosions.push({ x: pX + Math.cos(baseAngle)*100, y: pY + Math.sin(baseAngle)*100, radius: 140, life: 12, isHoly: true });
+            room.zombies.forEach(z => {
+                const zX = z.x + z.size / 2;
+                const zY = z.y + z.size / 2;
+                if (Math.hypot(zX - pX, zY - pY) <= 160) {
+                    z.hp -= finalDamage * 1.5;
+                    p.totalDamage += Math.round(finalDamage * 1.5);
+                    p.hp = Math.min(p.maxHp, p.hp + 2);
+                }
+            });
+            return;
+        }
+
+        if (p.weaponType === 'lichStaff') {
+            for (let i = -1; i <= 1; i++) {
+                const angle = baseAngle + (i * 0.15);
+                room.bullets.push({
+                    x: p.x + p.size / 2, y: p.y + p.size / 2,
+                    dx: Math.cos(angle), dy: Math.sin(angle),
+                    speed: 15, size: 16, damage: finalDamage * 1.2,
+                    owner: socket.id, life: 70, isMagicOrb: true, element: 'shadow', pierce: 3
+                });
+            }
+            return;
+        }
+
+        if ((p.class === 'melee' || p.class === 'paladin' || p.weaponType === 'scythe' || p.weaponType === 'warMace') && !['flamethrower','freezeRay','megaWeapon'].includes(p.weaponType)) {
+            const pX = p.x + p.size / 2;
+            const pY = p.y + p.size / 2;
+            const range = p.weaponType === 'katana' ? 140 : p.weaponType === 'scythe' ? 150 : p.weaponType === 'warMace' ? 145 : 120;
             room.slashArcs.push({ x: pX, y: pY, angle: baseAngle, range, weapon: p.weaponType, life: 6, owner: socket.id });
 
             room.zombies.forEach(z => {
@@ -466,8 +549,8 @@ io.on('connection', (socket) => {
                     if (diff <= Math.PI / 3) {
                         z.hp -= finalDamage;
                         p.totalDamage += Math.round(finalDamage);
-                        z.x += Math.cos(angleToZ) * 35;
-                        z.y += Math.sin(angleToZ) * 35;
+                        z.x += Math.cos(angleToZ) * 45;
+                        z.y += Math.sin(angleToZ) * 45;
 
                         if (z.hp <= 0 && !z.rewarded) {
                             z.rewarded = true;
@@ -475,7 +558,7 @@ io.on('connection', (socket) => {
                             p.hp = Math.min(p.maxHp, p.hp + (p.perks.includes('vampirism') ? 4 : 0));
                             
                             room.bloodSplatters.push({ x: z.x + z.size/2, y: z.y + z.size/2, radius: z.size/2 + Math.random()*15 });
-                            if (room.bloodSplatters.length > 50) room.bloodSplatters.shift();
+                            if (room.bloodSplatters.length > 80) room.bloodSplatters.shift();
 
                             const baseReward = (z.type === 'boss' ? 800 : 35) * (room.environmentalEvent === 'bloodMoon' ? 2.5 : 1);
                             for (let id in room.players) {
@@ -492,14 +575,14 @@ io.on('connection', (socket) => {
         if (p.class === 'mage' && p.weaponType === 'lightning') {
             const pX = p.x + p.size / 2;
             const pY = p.y + p.size / 2;
-            const beamEndX = pX + Math.cos(baseAngle) * 450;
-            const beamEndY = pY + Math.sin(baseAngle) * 450;
+            const beamEndX = pX + Math.cos(baseAngle) * 500;
+            const beamEndY = pY + Math.sin(baseAngle) * 500;
             room.lightningBeams.push({ startX: pX, startY: pY, endX: beamEndX, endY: beamEndY, life: 8 });
 
             room.zombies.forEach(z => {
                 const zX = z.x + z.size / 2;
                 const zY = z.y + z.size / 2;
-                if (Math.hypot(zX - pX, zY - pY) <= 450) {
+                if (Math.hypot(zX - pX, zY - pY) <= 500) {
                     const angleToZ = Math.atan2(zY - pY, zX - pX);
                     let diff = Math.abs(baseAngle - angleToZ);
                     while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
@@ -541,7 +624,7 @@ io.on('connection', (socket) => {
         const p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
-        if (!room.waveActive && (item === 'mage' || item === 'melee' || item === 'marksman' || item === 'necromancer')) {
+        if (!room.waveActive && classData[item]) {
             if (p.money >= 15000) {
                 p.money -= 15000;
                 const stats = classData[item];
@@ -573,9 +656,12 @@ io.on('connection', (socket) => {
         else if (item === 'minigun'   && p.class === 'marksman'    && p.money >= 650  && !['minigun','megaWeapon'].includes(p.weaponType))             { p.money -= 650;  p.weaponType = 'minigun';  p.maxAmmo = 200; p.ammo = 200; p.damage = 15;  p.bulletSize = base.bulletSize * 3; p.attackSpeed = 'Very Fast (0.16s)'; }
         else if (item === 'fireStaff' && p.class === 'mage'        && p.money >= 400  && !['fireStaff','lightning','megaWeapon'].includes(p.weaponType)) { p.money -= 400;  p.weaponType = 'fireStaff'; p.bulletSize = 26; p.damage = 180; p.manaCost = 22; p.attackSpeed = 'Slow (0.9s)'; }
         else if (item === 'lightning' && p.class === 'mage'        && p.money >= 700  && !['lightning','megaWeapon'].includes(p.weaponType))            { p.money -= 700;  p.weaponType = 'lightning'; p.bulletSize = 10; p.damage = 140; p.manaCost = 18; p.attackSpeed = 'Medium (0.6s)'; }
-        else if (item === 'scythe'    && p.class === 'necromancer' && p.money >= 500  && !['scythe','megaWeapon'].includes(p.weaponType))                { p.money -= 500;  p.weaponType = 'scythe';   p.bulletSize = 20; p.damage = 280; p.manaCost = 14; p.attackSpeed = 'Medium (0.5s)'; }
+        else if (item === 'scythe'    && p.class === 'necromancer' && p.money >= 500  && !['scythe','lichStaff','megaWeapon'].includes(p.weaponType))    { p.money -= 500;  p.weaponType = 'scythe';   p.bulletSize = 20; p.damage = 280; p.manaCost = 14; p.attackSpeed = 'Medium (0.5s)'; }
+        else if (item === 'lichStaff' && p.class === 'necromancer' && p.money >= 850  && !['lichStaff','megaWeapon'].includes(p.weaponType))           { p.money -= 850;  p.weaponType = 'lichStaff'; p.bulletSize = 16; p.damage = 220; p.manaCost = 20; p.attackSpeed = 'Fast Triple Beam'; }
         else if (item === 'fireAx'    && p.class === 'melee'       && p.money >= 300  && !['fireAx','katana','megaWeapon'].includes(p.weaponType))       { p.money -= 300;  p.weaponType = 'fireAx';   p.bulletSize = 18; p.damage = 240; p.attackSpeed = 'Medium (0.55s)'; }
         else if (item === 'katana'    && p.class === 'melee'       && p.money >= 600  && !['katana','megaWeapon'].includes(p.weaponType))                { p.money -= 600;  p.weaponType = 'katana';   p.bulletSize = 16; p.damage = 320; p.speed += base.speed * 0.05; p.attackSpeed = 'Fast (0.35s)'; }
+        else if (item === 'warMace'   && p.class === 'paladin'     && p.money >= 450  && !['warMace','thunderHammer','megaWeapon'].includes(p.weaponType)) { p.money -= 450; p.weaponType = 'warMace';  p.damage = 250; p.attackSpeed = 'Heavy Impact (0.48s)'; }
+        else if (item === 'thunderHammer' && p.class === 'paladin' && p.money >= 900  && !['thunderHammer','megaWeapon'].includes(p.weaponType))        { p.money -= 900;  p.weaponType = 'thunderHammer'; p.damage = 380; p.attackSpeed = 'Lightning Smash (0.42s)'; }
         else if (item === 'megaWeapon' && p.money >= 150000 && p.weaponType !== 'megaWeapon') { p.money -= 150000; p.weaponType = 'megaWeapon'; p.damage *= 2.5; p.hasForceField = true; p.attackSpeed = 'Rapid Spread'; }
     });
 
@@ -635,7 +721,13 @@ setInterval(() => {
         room.reviveBeacons = room.reviveBeacons.filter(b => !b.revived && room.players[b.targetPlayerId] && room.players[b.targetPlayerId].hp <= 0);
 
         if (playerList.length > 0 && playerList.every(p => p.hp <= 0)) {
-            room.gameOver = true;
+            if (!room.gameOver) {
+                room.gameOver = true;
+                let topKills = 0;
+                playerList.forEach(p => { if (p.totalKills > topKills) topKills = p.totalKills; });
+                updateLeaderboard('Survivor Squad', room.wave, topKills);
+                io.emit('leaderboardUpdate', leaderboard);
+            }
         }
 
         for (let id in room.players) {
@@ -656,19 +748,39 @@ setInterval(() => {
             room.environmentalEvent = null;
         }
 
+        // Air-Drop Mystery Supply Crate Spawner
+        room.crateTimer = (room.crateTimer || 0) + 1;
+        if (room.crateTimer >= 900) {
+            room.crateTimer = 0;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * (ARENA_RADIUS - 300);
+            const crateTypes = ['flamethrower', 'freezeRay', 'nuke'];
+            room.supplyCrates.push({
+                x: ARENA_CENTER_X + Math.cos(angle) * dist,
+                y: ARENA_CENTER_Y + Math.sin(angle) * dist,
+                type: crateTypes[Math.floor(Math.random() * crateTypes.length)],
+                size: 44,
+                fallY: -200
+            });
+        }
+
+        room.supplyCrates.forEach(c => {
+            if (c.fallY < 0) c.fallY += 10;
+        });
+
         if (!room.waveActive) {
             room.shopTimer -= 1 / 30;
             if (room.shopTimer <= 0) {
                 room.wave++;
                 room.waveActive = true;
-                room.zombiesToSpawn = room.isBossRush ? Math.min(6, room.wave + 1) : room.wave * 5;
+                room.zombiesToSpawn = room.isBossRush ? Math.min(8, room.wave + 2) : room.wave * 7;
                 room.totalZombiesThisWave = room.zombiesToSpawn;
                 room.bossSpawnedThisWave = false;
                 room.shopTimer = 30;
                 room.waveClearHandled = false;
             }
         } else {
-            if (room.zombiesToSpawn > 0 && Math.random() < 0.25) {
+            if (room.zombiesToSpawn > 0 && Math.random() < 0.3) {
                 let zType = 'normal';
                 const roll = Math.random();
 
@@ -676,26 +788,28 @@ setInterval(() => {
                     zType = 'boss';
                 } else {
                     if      (room.wave % 10 === 0 && !room.bossSpawnedThisWave) { zType = 'boss';   room.bossSpawnedThisWave = true; }
-                    else if (room.wave >= 4 && roll < 0.25)                      { zType = 'spitter'; }
-                    else if (room.wave >= 2 && roll < 0.50)                      { zType = 'tank';   }
-                    else if (room.wave >= 3 && roll > 0.70)                      { zType = 'runner'; }
+                    else if (room.wave >= 5 && roll < 0.20)                      { zType = 'stalker'; }
+                    else if (room.wave >= 4 && roll < 0.40)                      { zType = 'spitter'; }
+                    else if (room.wave >= 2 && roll < 0.65)                      { zType = 'tank';   }
+                    else if (room.wave >= 3 && roll > 0.75)                      { zType = 'runner'; }
                 }
 
                 let zHp    = 35 + (room.wave * 12);
                 let zSpeed = (1.2 + (room.wave * 0.12)) * (room.environmentalEvent === 'bloodMoon' ? 1.35 : 1);
                 let zSize  = 40;
 
-                if      (zType === 'boss')   { zHp = (room.isBossRush ? 2000 : 3500) + (room.wave * 600); zSpeed = 1.8 + (room.wave * 0.03); zSize = 110; }
+                if      (zType === 'boss')   { zHp = (room.isBossRush ? 2200 : 3800) + (room.wave * 650); zSpeed = 1.8 + (room.wave * 0.03); zSize = 110; }
                 else if (zType === 'tank')   { zHp *= 5;   zSpeed *= 0.35; zSize = 65; }
                 else if (zType === 'spitter'){ zHp *= 1.2; zSpeed *= 0.9;  zSize = 42; }
                 else if (zType === 'runner') { zHp *= 0.6; zSpeed *= 1.9;  zSize = 30; }
+                else if (zType === 'stalker'){ zHp *= 1.5; zSpeed *= 1.4;  zSize = 36; }
 
                 const spawnAngle = Math.random() * Math.PI * 2;
                 room.zombies.push({
                     x: ARENA_CENTER_X + Math.cos(spawnAngle) * ARENA_RADIUS,
                     y: ARENA_CENTER_Y + Math.sin(spawnAngle) * ARENA_RADIUS,
                     size: zSize, hp: zHp, maxHp: zHp, speed: zSpeed, type: zType, rewarded: false, frozenTimer: 0,
-                    spitTimer: 0, stompTimer: 0
+                    spitTimer: 0, stompTimer: 0, isStealth: zType === 'stalker'
                 });
                 room.zombiesToSpawn--;
             }
@@ -932,7 +1046,7 @@ setInterval(() => {
                         z.rewarded = true;
                         
                         room.bloodSplatters.push({ x: z.x + z.size/2, y: z.y + z.size/2, radius: z.size/2 + Math.random()*15 });
-                        if (room.bloodSplatters.length > 50) room.bloodSplatters.shift();
+                        if (room.bloodSplatters.length > 80) room.bloodSplatters.shift();
 
                         const baseReward = (z.type === 'boss' ? 800 : 35) * (room.environmentalEvent === 'bloodMoon' ? 2.5 : 1);
                         
@@ -973,6 +1087,26 @@ setInterval(() => {
                 }
             });
         });
+
+        // Handle Supply Crate Pickups
+        for (let id in room.players) {
+            const p = room.players[id];
+            if (p.hp <= 0) continue;
+            room.supplyCrates = room.supplyCrates.filter(c => {
+                if (Math.hypot((p.x + p.size/2) - c.x, (p.y + p.size/2) - c.y) < 45) {
+                    if (c.type === 'nuke') {
+                        room.explosions.push({ x: ARENA_CENTER_X, y: ARENA_CENTER_Y, radius: 1500, life: 30, isNuke: true });
+                        room.zombies.forEach(z => z.hp = 0);
+                        io.to(code).emit('killstreak', { player: p.avatar, title: '☢️ TACTICAL NUKE LAUNCHED!' });
+                    } else {
+                        p.weaponType = c.type;
+                        p.damage = c.type === 'flamethrower' ? 60 : 180;
+                    }
+                    return false;
+                }
+                return true;
+            });
+        }
 
         room.slashArcs = room.slashArcs || [];
         room.slashArcs.forEach(sa => sa.life--);
@@ -1015,7 +1149,7 @@ setInterval(() => {
             room.waveClearHandled = true;
             room.shopTimer = 30;
 
-            const baseRoundBonus = 100 + (room.wave * 50);
+            const baseRoundBonus = 120 + (room.wave * 60);
             
             for (let id in room.players) {
                 const recipient = room.players[id];
@@ -1037,11 +1171,11 @@ setInterval(() => {
                 io.to(code).emit('perkPhase', perkOptions);
             }
 
-            room.pickups.push({ x: ARENA_CENTER_X + (Math.random() * 200 - 100), y: ARENA_CENTER_Y + (Math.random() * 200 - 100), type: 'health' });
+            room.pickups.push({ x: ARENA_CENTER_X + (Math.random() * 300 - 150), y: ARENA_CENTER_Y + (Math.random() * 300 - 150), type: 'health' });
 
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < 4; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const dist  = Math.random() * (ARENA_RADIUS - 200);
+                const dist  = Math.random() * (ARENA_RADIUS - 300);
                 room.barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
             }
         }
@@ -1056,6 +1190,7 @@ setInterval(() => {
             reviveBeacons: room.reviveBeacons,
             orbitalStrikes: room.orbitalStrikes,
             bloodSplatters: room.bloodSplatters,
+            supplyCrates: room.supplyCrates,
             pickups: room.pickups,
             barrels: room.barrels,
             explosions: room.explosions,
