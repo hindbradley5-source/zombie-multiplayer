@@ -57,7 +57,8 @@ io.on('connection', (socket) => {
             waveActive: false,
             gameStarted: false,
             bossSpawnedThisWave: false,
-            shopTimer: 30
+            shopTimer: 30,
+            waveClearHandled: false
         };
         socket.roomCode = code;
         socket.join(code);
@@ -98,7 +99,7 @@ io.on('connection', (socket) => {
     socket.on('joinParty', (code) => {
         const upperCode = code ? code.trim().toUpperCase() : '';
         
-        if (rooms[upperCode]) {
+        if (rooms[upperCode] && !rooms[upperCode].gameStarted) {
             socket.roomCode = upperCode;
             socket.join(upperCode);
 
@@ -125,13 +126,13 @@ io.on('connection', (socket) => {
             socket.emit('partyJoined', upperCode);
             io.to(upperCode).emit('lobbyUpdate', rooms[upperCode].players);
         } else {
-            socket.emit('partyError', 'Party code not found!');
+            socket.emit('partyError', 'Party not found or game already in progress!');
         }
     });
 
     socket.on('selectClass', (playerClass) => {
         const room = rooms[socket.roomCode];
-        if (!room) return;
+        if (!room || room.gameStarted) return; // FIX 5: block mid-game class changes
 
         const stats = classData[playerClass];
         if (room.players[socket.id]) {
@@ -177,6 +178,7 @@ io.on('connection', (socket) => {
         room.wave = 1;
         room.zombiesToSpawn = 5;
         room.totalZombiesThisWave = 5;
+        room.waveClearHandled = false;
 
         io.to(socket.roomCode).emit('gameStarted');
     });
@@ -314,6 +316,7 @@ io.on('connection', (socket) => {
     socket.on('respawn', () => {
         const room = rooms[socket.roomCode];
         if (!room) return;
+        if (room.waveActive) return; // FIX 4: no respawning mid-wave
         let p = room.players[socket.id];
         if (p && p.hp <= 0) {
             p.hp = p.maxHp;
@@ -327,6 +330,7 @@ io.on('connection', (socket) => {
 
     socket.on('buy', (item) => {
         const room = rooms[socket.roomCode];
+        if (!room) return; // FIX 1: crash if socket has no roomCode
         let p = room.players[socket.id];
         if (!p || p.hp <= 0) return;
 
@@ -462,6 +466,7 @@ setInterval(() => {
                 room.totalZombiesThisWave = room.zombiesToSpawn;
                 room.bossSpawnedThisWave = false;
                 room.shopTimer = 30;
+                room.waveClearHandled = false;
             }
         } else {
             if (room.zombiesToSpawn > 0 && Math.random() < 0.25) {
@@ -581,17 +586,21 @@ setInterval(() => {
             });
 
             room.zombies.forEach((z) => {
+                if (b.markedForDeletion) return; // FIX 2: bullet already hit something this tick - no piercing
                 if (b.x > z.x && b.x < z.x + z.size && b.y > z.y && b.y < z.y + z.size) {
                     z.hp -= b.damage;
-                    b.markedForDeletion = true; 
+                    b.markedForDeletion = true;
 
                     if (z.hp <= 0 && !z.rewarded) {
                         z.rewarded = true;
                         let reward = z.type === 'boss' ? 800 : 35;
                         for (let id in room.players) {
-excelPath =                        room.players[id].money += reward;
+                            // FIX 3: only living players earn kill money
+                            if (room.players[id].hp > 0) {
+                                room.players[id].money += reward;
+                            }
                         }
-                        
+
                         if (Math.random() < 0.20) {
                             let pTypes = ['speed', 'doubleDamage', 'nuke'];
                             let chosenType = pTypes[Math.floor(Math.random() * pTypes.length)];
@@ -627,26 +636,35 @@ excelPath =                        room.players[id].money += reward;
             let p = room.players[id];
             if (p.hp <= 0) continue;
 
-            room.pickups.filter(Boolean).forEach((pickup, index) => {
+            // BUG FIX: splice-while-iterating skips pickups; use filter instead
+            let pickedUp = false;
+            room.pickups = room.pickups.filter(pickup => {
+                if (pickedUp) return true;
                 let dist = Math.hypot(p.x - pickup.x, p.y - pickup.y);
                 if (dist < 40) {
                     if (pickup.type === 'health') {
                         p.hp = Math.min(p.maxHp, p.hp + 50);
                     } else {
                         p.powerUpType = pickup.type;
-                        p.powerUpTimer = 300; 
+                        p.powerUpTimer = 300;
                     }
-                    room.pickups.splice(index, 1); 
+                    pickedUp = true;
+                    return false;
                 }
+                return true;
             });
         }
 
-        // FIXED: Using room.zombiesToSpawn === 0 caused a bug because room.zombiesToSpawn starts at 0 
-        // on the exact tick a wave starts before the spawner code has a chance to run. 
-        // Checking room.zombiesToSpawn <= 0 instantly triggered completion on wave 4 (or any wave) 
-        // before any zombies could spawn. Now it accurately tracks totalZombiesThisWave.
-        if (room.waveActive && room.zombiesToSpawn <= 0 && room.totalZombiesThisWave > 0 && room.zombies.length === 0) {
+        // BUG FIX 1: waveClearHandled flag prevents this block firing 30x/sec once conditions are met,
+        //   which was spamming round bonuses, health packs and barrels every tick.
+        // BUG FIX 2: spawnedSoFar check means we require at least one zombie to have actually
+        //   entered the arena before we consider the wave clearable. Without this, a nuke power-up
+        //   wiping all alive zombies on the same tick the last one spawned (zombiesToSpawn just hit 0)
+        //   could trigger wave-end before any zombie had a chance to be alive on-screen.
+        let spawnedSoFar = room.totalZombiesThisWave - room.zombiesToSpawn;
+        if (room.waveActive && !room.waveClearHandled && room.zombiesToSpawn <= 0 && spawnedSoFar > 0 && room.zombies.length === 0) {
             room.waveActive = false;
+            room.waveClearHandled = true;
             room.shopTimer = 30; 
             
             let roundBonus = 100 + (room.wave * 50);
