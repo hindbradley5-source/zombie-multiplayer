@@ -330,9 +330,11 @@
 
         let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], speechBubbles: [], wave: 1, waveActive: false, shopTimer: 30 };
         let selectedAvatarSymbol = '🤠';
+        let isDead = false; // FIX 8: guard so death screen doesn't flicker every stateUpdate
 
-        // Auto-join room from URL search params if present (e.g. ?room=ABCD)
-        window.addEventListener('DOMContentLoaded', () => {
+        // Auto-join from URL param - runs after socket.on handlers are registered so events are caught
+        socket.on('connect', function onFirstConnect() {
+            socket.off('connect', onFirstConnect); // one-shot, remove after first fire
             const urlParams = new URLSearchParams(window.location.search);
             const roomCode = urlParams.get('room');
             if (roomCode) {
@@ -426,19 +428,24 @@
             let me = gameState.players[socket.id];
             if (me) {
                 document.getElementById('money-display').innerText = me.money;
-                document.getElementById('hp-display').innerText = `${Math.max(0, me.hp)}/${me.maxHp}`;
+                document.getElementById('hp-display').innerText = `${Math.max(0, Math.ceil(me.hp))}/${me.maxHp}`;
 
-                if (me.hp <= 0) {
+                // FIX 8: only trigger death screen once, not every stateUpdate tick
+                if (me.hp <= 0 && !isDead) {
+                    isDead = true;
                     deathScreen.classList.remove('hidden');
                     inGameMenuBtn.classList.add('hidden');
-                } else {
+                } else if (me.hp > 0 && isDead) {
+                    // Player respawned
+                    isDead = false;
                     deathScreen.classList.add('hidden');
                     inGameMenuBtn.classList.remove('hidden');
                 }
 
                 let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
                 let statusText = ``;
-                if (me.dashCooldown > 0) statusText += ` | Dash CD: ${me.dashCooldown}`;
+                // FIX 11: show dash cooldown in seconds (30 ticks/sec), not raw frames
+                if (me.dashCooldown > 0) statusText += ` | Dash: ${(me.dashCooldown / 30).toFixed(1)}s`;
                 if (me.powerUpType) statusText += ` | [⚡ ${me.powerUpType.toUpperCase()}]`;
 
                 if (me.class === 'marksman' && me.weaponType !== 'megaWeapon') {
@@ -462,7 +469,8 @@
             keys[e.key.toLowerCase()] = true; 
             if (e.code === 'Space') {
                 e.preventDefault();
-                if (lobbyScreen.classList.contains('hidden')) {
+                // FIX 6b: don't send dash while lobby or shop is open
+                if (lobbyScreen.classList.contains('hidden') && shop.classList.contains('hidden')) {
                     socket.emit('move', {
                         up: keys['w'] || keys['arrowup'],
                         down: keys['s'] || keys['arrowdown'],
@@ -476,7 +484,9 @@
         window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
         setInterval(() => {
+            // FIX 6: don't send move events when lobby or shop is visible
             if (!lobbyScreen.classList.contains('hidden')) return;
+            if (!shop.classList.contains('hidden')) return;
             socket.emit('move', {
                 up: keys['w'] || keys['arrowup'],
                 down: keys['s'] || keys['arrowdown'],
@@ -486,19 +496,40 @@
             });
         }, 1000 / 30);
 
-        canvas.addEventListener('click', (e) => {
+        // FIX 7: hold mouse to auto-fire instead of single click only
+        let mouseDown = false;
+        let lastMousePos = { x: 0, y: 0 };
+
+        canvas.addEventListener('mousemove', (e) => {
+            lastMousePos.x = e.clientX;
+            lastMousePos.y = e.clientY;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
             if (!lobbyScreen.classList.contains('hidden')) return;
+            if (!shop.classList.contains('hidden')) return;
+            mouseDown = true;
             const me = gameState.players[socket.id];
             if (!me) return;
-
             const camX = me.x - canvas.width / 2;
             const camY = me.y - canvas.height / 2;
-
-            socket.emit('shoot', { 
-                x: e.clientX + camX, 
-                y: e.clientY + camY 
-            });
+            socket.emit('shoot', { x: e.clientX + camX, y: e.clientY + camY });
         });
+
+        canvas.addEventListener('mouseup', () => { mouseDown = false; });
+        canvas.addEventListener('mouseleave', () => { mouseDown = false; });
+
+        // Auto-fire interval while mouse is held (100ms so it doesn't spam too fast)
+        setInterval(() => {
+            if (!mouseDown) return;
+            if (!lobbyScreen.classList.contains('hidden')) return;
+            if (!shop.classList.contains('hidden')) return;
+            const me = gameState.players[socket.id];
+            if (!me || me.hp <= 0) return;
+            const camX = me.x - canvas.width / 2;
+            const camY = me.y - canvas.height / 2;
+            socket.emit('shoot', { x: lastMousePos.x + camX, y: lastMousePos.y + camY });
+        }, 100);
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -592,6 +623,7 @@
                     ctx.fillRect(z.x, z.y - 12, z.size, 5);
                     ctx.fillStyle = '#00ff00';
                     ctx.fillRect(z.x, z.y - 12, z.size * Math.max(0, (z.hp / z.maxHp)), 5);
+                    ctx.fillStyle = '#f39c12'; // FIX 10: reset fillStyle so bullets don't inherit HP bar colour
                 });
 
                 for (let id in gameState.players) {
@@ -614,6 +646,7 @@
                         ctx.fillRect(p.x, p.y - 15, p.size, 5);
                         ctx.fillStyle = '#00ff00';
                         ctx.fillRect(p.x, p.y - 15, p.size * Math.max(0, (p.hp / p.maxHp)), 5);
+                        ctx.fillStyle = '#f39c12'; // reset after HP bar
                     }
                 }
 
