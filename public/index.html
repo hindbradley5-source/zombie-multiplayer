@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Zombie Survival FPS / Top-Down</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <!-- 💻 Real-Time FPS & Latency Counter Badge -->
+        <div id="fps-badge">60 FPS | 12ms</div>
+
+        <!-- 📋 Toast Notification Badge -->
+        <div id="toast-msg">Copied!</div>
+
+        <!-- Low HP Red Vignette -->
+        <div id="low-hp-vignette"></div>
+
+        <!-- Boss Health Bar Banner -->
+        <div id="boss-hp-banner">
+            <div class="boss-name">👹 DEMONIC BOSS OVERLORD</div>
+            <div class="boss-hp-outer"><div id="boss-hp-bar" class="boss-hp-inner"></div></div>
+        </div>
+
+        <!-- Event & Killstreak Banners -->
+        <div id="event-banner">🩸 BLOOD MOON ACTIVE</div>
+        <div id="killstreak-banner">RAMPAGE!</div>
+
+        <!-- HUD Overlay -->
+        <div id="hud">
+            <div class="hud-card">
+                <div class="hud-label">Health</div>
+                <div class="hp-bar-outer"><div id="hp-bar" class="hp-bar-inner"></div></div>
+            </div>
+            <div class="hud-divider"></div>
+            <div class="hud-card">
+                <div class="hud-label">Class & Weapon</div>
+                <div id="hud-class" class="hud-value">Marksman</div>
+            </div>
+            <div class="hud-divider"></div>
+            <div class="hud-card">
+                <div class="hud-label">Cash</div>
+                <div id="hud-money" class="hud-value" style="color: var(--accent-gold);">$0</div>
+            </div>
+            <div class="hud-divider"></div>
+            <div class="hud-card">
+                <div class="hud-label">Wave / Timer</div>
+                <div id="hud-wave" class="hud-value">Wave 1 (30s)</div>
+            </div>
+            <div class="hud-divider"></div>
+            <!-- Ultimate Meter -->
+            <div class="hud-card">
+                <div class="hud-label">ULTIMATE (F)</div>
+                <div class="hp-bar-outer" style="width: 110px;"><div id="ult-bar" class="hp-bar-inner" style="background: linear-gradient(90deg, #a855f7, #f1c40f); width: 0%;"></div></div>
+            </div>
+            <div class="hud-divider"></div>
+            <!-- Mute SFX Toggle -->
+            <button id="audio-toggle-btn" class="btn-hud-menu" onclick="toggleAudio()" style="min-width: 90px;">🔊 SFX ON</button>
+            <button class="btn-hud-menu" onclick="togglePause()">⚙️ PAUSE</button>
+            <button class="btn-hud-menu" onclick="leaveToMenu()">🏠 MENU</button>
+        </div>
+
+        <!-- Mini-Map Radar -->
+        <div id="minimap-card">
+            <canvas id="minimap" width="130" height="130"></canvas>
+        </div>
+
+        <!-- Cooldown Indicators & Skill Tooltip -->
+        <div id="cd-container">
+            <div class="cd-box">
+                <div class="hud-label">Dash (Space)</div>
+                <div id="hud-dash-cd" class="hud-value" style="color: var(--accent-green);">READY</div>
+            </div>
+            <div class="cd-box">
+                <div class="hud-label">Skill (R-Click)</div>
+                <div id="hud-skill-cd" class="hud-value" style="color: var(--accent-blue);">READY</div>
+                <div id="hud-skill-desc" style="font-size: 10px; color: #cbd5e1; margin-top: 4px; font-weight: 700;">Holy Shield (5s Invincible + 320 AoE)</div>
+            </div>
+            <div class="cd-box">
+                <div class="hud-label">Ultimate (F)</div>
+                <div id="hud-ult-status" class="hud-value" style="color: var(--accent-purple);">0%</div>
+            </div>
+        </div>
+
+        <!-- Keybinds Bar -->
+        <div id="controls-bar">
+            <span><span class="key-badge">WASD</span> Move</span>
+            <span><span class="key-badge">L-Click</span> Shoot</span>
+            <span><span class="key-badge">T</span> Auto-Fire</span>
+            <span><span class="key-badge">R-Click</span> Skill</span>
+            <span><span class="key-badge">Space</span> Dash</span>
+            <span><span class="key-badge">F</span> Ult</span>
+            <span><span class="key-badge">H</span> Heal ($50)</span>
+            <span><span class="key-badge">B</span> Shop</span>
+            <span><span class="key-badge">V</span> Ping</span>
+            <span><span class="key-badge">Esc</span> Pause</span>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- ⚙️ PAUSE / SETTINGS MODAL OVERLAY -->
+        <div id="pause-modal" class="hidden">
+            <div class="menu-card">
+                <div class="menu-title" style="font-size: 36px; margin-bottom: 10px;">⚙️ GAME PAUSED</div>
+                <p style="color: #cbd5e1; font-size: 14px; margin-bottom: 25px;">Adjust your settings or return to combat.</p>
+                <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                    <button class="btn-primary" onclick="togglePause()" style="width: 100%;">▶️ RESUME GAME</button>
+                    <button class="btn-hud-menu" onclick="toggleAudio()" style="width: 100%; padding: 12px;">🔊 TOGGLE SFX SOUND</button>
+                    <button class="btn-bossrush" onclick="leaveToMenu()" style="width: 100%;">🏠 LEAVE TO MAIN MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby Start Screen -->
+        <div id="lobby-screen" class="screen">
+            <div style="display: flex; gap: 30px; align-items: flex-start; max-width: 900px;">
+                <!-- Main Menu Card -->
+                <div class="menu-card">
+                    <div class="menu-title">ZOMBIE SURVIVAL</div>
+                    <p style="color: #cbd5e1; font-size: 14px; margin-top: 0;">Select your survivor class & launch into combat!</p>
+                    
+                    <!-- Survivor Name Input -->
+                    <div style="margin-bottom: 15px;">
+                        <input id="player-name-input" placeholder="ENTER YOUR NAME" maxlength="15" style="width: 80%; font-size: 16px; font-weight: 800; border-color: var(--accent-gold);" />
+                    </div>
+
+                    <div class="class-selector">
+                        <button class="class-btn selected" onclick="chooseClass('marksman')" ondblclick="startSoloGame()" title="Double-click to Quick Start!">🤠 Marksman</button>
+                        <button class="class-btn" onclick="chooseClass('mage')" ondblclick="startSoloGame()" title="Double-click to Quick Start!">🧙‍♂️ Mage</button>
+                        <button class="class-btn" onclick="chooseClass('melee')" ondblclick="startSoloGame()" title="Double-click to Quick Start!">⚔️ Melee</button>
+                        <button class="class-btn" onclick="chooseClass('necromancer')" ondblclick="startSoloGame()" title="Double-click to Quick Start!">🔮 Necromancer</button>
+                        <button class="class-btn" onclick="chooseClass('paladin')" ondblclick="startSoloGame()" style="grid-column: span 2;" title="Double-click to Quick Start!">🛡️ Paladin</button>
+                    </div>
+
+                    <!-- Solo & Boss Rush Buttons -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                        <button class="btn-solo" onclick="startSoloGame()" style="flex: 1;">⚡ PLAY SOLO</button>
+                        <button class="btn-bossrush" onclick="startBossRush()" style="flex: 1;">👹 BOSS RUSH</button>
+                    </div>
+
+                    <div style="border-top: 1px solid var(--panel-border); padding-top: 20px; margin-top: 10px;">
+                        <div style="font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 800; margin-bottom: 10px;">Multiplayer Co-op Lobby</div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-primary" onclick="createParty()" style="flex: 1;">Create Party</button>
+                            <input id="party-code-input" placeholder="CODE" style="width: 90px;" />
+                            <button class="btn-primary" onclick="joinParty()">Join</button>
+                        </div>
+                    </div>
+
+                    <div id="lobby-info" style="margin-top: 15px; font-weight: 700; color: var(--accent-gold); cursor: pointer;" onclick="copyPartyCode()" title="Click to Copy Code"></div>
+                    <button id="start-btn" class="hidden" onclick="startGame()" style="margin-top: 15px; width: 100%; background: linear-gradient(135deg, #ef4444, #dc2626);">START MULTIPLAYER</button>
+                </div>
+
+                <!-- Leaderboard Side Card -->
+                <div class="menu-card" style="width: 320px; text-align: left;">
+                    <div style="font-size: 20px; font-weight: 900; color: var(--accent-gold); text-transform: uppercase; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                        🏆 Top Survivors
+                    </div>
+                    <div id="leaderboard-list" style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #cbd5e1;">
+                        <div style="color: #64748b;">No high scores recorded yet. Be the first!</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 💀 DEATH / GAME OVER OVERLAY SCREEN -->
+        <div id="death-screen" class="hidden">
+            <div class="death-title">💀 YOU DIED</div>
+            <p style="color: #cbd5e1; font-size: 16px; margin-top: 0;">The horde overwhelmed your survivor!</p>
+
+            <div class="death-stats-card">
+                <div class="death-stat-box">
+                    <div class="hud-label">Wave Reached</div>
+                    <div id="death-wave" class="death-stat-val">Wave 1</div>
+                </div>
+                <div class="death-stat-box">
+                    <div class="hud-label">Total Kills</div>
+                    <div id="death-kills" class="death-stat-val">0</div>
+                </div>
+                <div class="death-stat-box">
+                    <div class="hud-label">Damage Dealt</div>
+                    <div id="death-damage" class="death-stat-val">0</div>
+                </div>
+            </div>
+
+            <div class="death-actions">
+                <button class="btn-retry" onclick="retryGame()">🔄 RETRY NOW</button>
+                <button class="btn-lobby-return" onclick="leaveToMenu()">🏠 MAIN MENU</button>
+            </div>
+        </div>
+
+        <!-- 🛍️ CATEGORIZED ARMS DEALER SHOP OVERLAY -->
+        <div id="shop" class="hidden">
+            <div class="shop-header">
+                <h2>🛍️ ARMS DEALER SHOP</h2>
+                <p style="color: #cbd5e1; margin-bottom: 20px; font-weight: 600;">Upgrade your survivor, buy legendary class weapons, or deploy defenses! (Press B to Close)</p>
+            </div>
+            <div class="shop-columns">
+                <!-- Column 1: Survivor Stats -->
+                <div class="shop-column">
+                    <div class="shop-col-title">🛡️ SURVIVOR PERKS</div>
+                    <button class="shop-item-btn" onclick="buy('health')" title="Restores 100% HP instantly">❤️ Full Heals <span class="price-badge">$50</span></button>
+                    <button class="shop-item-btn" onclick="buy('maxHealth')" title="+10% Base Max HP">🛡️ +10% Max HP <span class="price-badge">$120</span></button>
+                    <button class="shop-item-btn" onclick="buy('damage')" title="+1% All Weapon Damage">💥 +1% Damage <span class="price-badge">$100</span></button>
+                    <button class="shop-item-btn" onclick="buy('speed')" title="+1% Movement Speed">⚡ +1% Speed <span class="price-badge">$75</span></button>
+                    <button class="shop-item-btn" onclick="buy('moneyGain')" title="+1% Cash Bonus on Kills">💰 +1% Cash Gain <span class="price-badge">$100</span></button>
+                </div>
+
+                <!-- Column 2: Weaponry & Upgrades -->
+                <div class="shop-column">
+                    <div class="shop-col-title">🔫 CLASS WEAPONRY</div>
+                    <button class="shop-item-btn" onclick="buy('shotgun')" title="3-Pellet Spread Shotgun">🔫 Shotgun (Marksman) <span class="price-badge">$350</span></button>
+                    <button class="shop-item-btn" onclick="buy('minigun')" title="200-Round Rapid Heavy Barrel">💣 Minigun (Marksman) <span class="price-badge">$650</span></button>
+                    <button class="shop-item-btn" onclick="buy('fireStaff')" title="Blazing Explosive Fireball Staff">🔥 Fire Staff (Mage) <span class="price-badge">$400</span></button>
+                    <button class="shop-item-btn" onclick="buy('lightning')" title="Electric Beam Bolt Arc">⚡ Lightning (Mage) <span class="price-badge">$700</span></button>
+                    <button class="shop-item-btn" onclick="buy('scythe')" title="Wide Purple Soul Slash Scythe">☠️ Scythe (Necro) <span class="price-badge">$500</span></button>
+                    <button class="shop-item-btn" onclick="buy('lichStaff')" title="Triple Piercing Shadow Beams">👁️ Lich Staff (Necro) <span class="price-badge">$850</span></button>
+                    <button class="shop-item-btn" onclick="buy('katana')" title="High Speed Razor Katana">🗡️ Katana (Melee) <span class="price-badge">$600</span></button>
+                    <button class="shop-item-btn" onclick="buy('warMace')" title="Heavy Impact Knockback Mace">🪓 War Mace (Paladin) <span class="price-badge">$450</span></button>
+                    <button class="shop-item-btn" onclick="buy('thunderHammer')" title="Lightning Slam & Holy Shockwave">⚡ Thunder Hammer (Paladin) <span class="price-badge">$900</span></button>
+                </div>
+
+                <!-- Column 3: Defensive Structures -->
+                <div class="shop-column">
+                    <div class="shop-col-title">🤖 BASE DEFENSES</div>
+                    <button class="shop-item-btn" onclick="placeTurret()" title="Deploys automated Sentry Turret">🤖 Sentry Turret (E) <span class="price-badge">$600</span></button>
+                    <button class="shop-item-btn" onclick="placeBarricade()" title="Deploys heavy barricade wall">🧱 Heavy Barricade (Q) <span class="price-badge">$250</span></button>
+                    <button class="shop-item-btn" onclick="buy('megaWeapon')" style="margin-top: 15px; border-color: var(--accent-gold);" title="Screen-wiping 12-Star Spread Weapon">🌟 MEGA WEAPON <span class="price-badge">$150,000</span></button>
+                </div>
+            </div>
+            <button onclick="startWaveEarly()" style="margin-top: 25px; background: linear-gradient(135deg, #f1c40f, #f39c12); color: #000; font-size: 16px; font-weight: 900;">START NEXT WAVE EARLY</button>
+        </div>
+
+        <!-- Perk Phase Modal -->
+        <div id="perk-modal" class="hidden">
+            <h2 style="color: var(--accent-gold); font-size: 34px; margin-bottom: 20px;">CHOOSE YOUR PERK</h2>
+            <div id="perk-cards-container" class="perk-cards"></div>
+        </div>
+    </div>
+
+    <!-- Client Logic Linked cleanly -->
+    <script src="script.js"></script>
+</body>
+</html>
