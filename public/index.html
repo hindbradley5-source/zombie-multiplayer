@@ -425,6 +425,10 @@
         <div id="shop" class="hidden">
             <div class="shop-header">
                 <h2>🛒 ARMORY & UPGRADES</h2>
+                <!-- Money display inside the shop -->
+                <div style="font-size: 18px; font-weight: 800; color: var(--accent-green); margin-top: 6px;">
+                    Balance: $<span id="shop-money-display">0</span>
+                </div>
                 <p style="font-size: 15px; color: #8a8a9e; margin-top: 6px;">Next wave starting in: <span id="shop-timer" style="color: var(--accent-red); font-weight: 800;">30</span>s</p>
                 <button onclick="startWaveEarly()" style="background: linear-gradient(135deg, #2980b9, #1f618d); padding: 8px 20px; font-size: 13px; margin-top: 4px;">⚡ Start Wave Now</button>
             </div>
@@ -439,6 +443,8 @@
                             <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP <span class="price-badge">$120</span></button>
                             <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently boosts damage output across all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage <span class="price-badge">$100</span></button>
                             <button onclick="buyItem('speed')" onmouseover="showTip('Tactical Boots', 'Increases base player movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed <span class="price-badge">$75</span></button>
+                            <!-- New +1% Money Gain Upgrade -->
+                            <button onclick="buyItem('moneyGain')" onmouseover="showTip('Bounty Hunter', 'Increases all money gained from kills and wave clear bonuses by +1%.', '+1% Gold Gain', '100')" onmouseleave="clearTip()">+1% Gold Gain <span class="price-badge">$100</span></button>
                         </div>
                     </div>
 
@@ -567,12 +573,10 @@
         let selectedAvatarSymbol = '🤠';
         let isDead = false;
 
-        // Client Juiciness Systems: Particles, Floating Texts & Camera Shake
         let particles = [];
         let floatingTexts = [];
         let cameraShake = 0;
         let lastHp = {};
-        let lastZombieCount = 0;
 
         function addParticle(x, y, color, count = 5, speed = 4) {
             for (let i = 0; i < count; i++) {
@@ -600,7 +604,6 @@
             });
         }
 
-        // Auto-join from URL param
         socket.on('connect', function onFirstConnect() {
             socket.off('connect', onFirstConnect);
             const urlParams = new URLSearchParams(window.location.search);
@@ -681,7 +684,6 @@
         });
 
         socket.on('stateUpdate', (state) => {
-            // Screen shake trigger on explosion
             if (state.explosions && state.explosions.length > gameState.explosions.length) {
                 cameraShake = 12;
                 state.explosions.forEach(ex => addParticle(ex.x, ex.y, '#e74c3c', 25, 8));
@@ -698,21 +700,21 @@
 
             let me = gameState.players[socket.id];
             if (me) {
+                // Update Money in HUD and inside Shop Header
                 document.getElementById('money-display').innerText = me.money;
+                document.getElementById('shop-money-display').innerText = me.money;
+
                 document.getElementById('hp-display').innerText = `${Math.max(0, Math.ceil(me.hp))}/${me.maxHp}`;
                 
-                // Dynamic Health Bar Width
                 let hpPercent = Math.max(0, (me.hp / me.maxHp) * 100);
                 document.getElementById('hp-bar').style.width = `${hpPercent}%`;
 
-                // Vignette update
                 if (hpPercent < 30 && me.hp > 0) {
                     vignette.classList.add('critical');
                 } else {
                     vignette.classList.remove('critical');
                 }
 
-                // Check hit particles & floating damage text on local player
                 if (lastHp[socket.id] !== undefined && me.hp < lastHp[socket.id]) {
                     const dmgTaken = Math.round(lastHp[socket.id] - me.hp);
                     addFloatingText(me.x + me.size/2, me.y, `-${dmgTaken}`, '#e74c3c');
@@ -826,7 +828,6 @@
                 let camX = me ? me.x - canvas.width / 2 : 0;
                 let camY = me ? me.y - canvas.height / 2 : 0;
 
-                // Shake effect offset
                 if (cameraShake > 0) {
                     camX += (Math.random() - 0.5) * cameraShake;
                     camY += (Math.random() - 0.5) * cameraShake;
@@ -862,7 +863,6 @@
                 ctx.arc(1000, 1000, 950, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // Draw Barrels
                 if (gameState.barrels) {
                     gameState.barrels.forEach(barrel => {
                         ctx.font = '32px Arial';
@@ -872,7 +872,6 @@
                     });
                 }
 
-                // Explosions
                 if (gameState.explosions) {
                     gameState.explosions.forEach(ex => {
                         ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
@@ -883,7 +882,6 @@
                     });
                 }
 
-                // Pickups (Nuka removed, standard drops drawn cleanly)
                 gameState.pickups.forEach(p => {
                     ctx.font = '32px Arial';
                     ctx.textAlign = 'center';
@@ -894,7 +892,6 @@
                     ctx.fillText(icon, p.x, p.y);
                 });
 
-                // Bullets with Glow
                 gameState.bullets.forEach(b => {
                     ctx.fillStyle = '#f39c12';
                     ctx.shadowColor = '#f39c12';
@@ -902,10 +899,9 @@
                     ctx.beginPath();
                     ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.shadowBlur = 0; // reset
+                    ctx.shadowBlur = 0;
                 });
 
-                // Zombies
                 gameState.zombies.forEach(z => {
                     ctx.font = `${z.size * 1.2}px Arial`;
                     ctx.textAlign = 'center';
@@ -929,7 +925,6 @@
                     ctx.fillStyle = '#f39c12';
                 });
 
-                // Players
                 for (let id in gameState.players) {
                     let p = gameState.players[id];
                     if (p.hp > 0) {
@@ -957,7 +952,6 @@
                     }
                 }
 
-                // Render Visual Particle Effects
                 for (let i = particles.length - 1; i >= 0; i--) {
                     let pt = particles[i];
                     pt.x += pt.vx;
@@ -970,7 +964,6 @@
                     if (pt.life <= 0) particles.splice(i, 1);
                 }
 
-                // Render Floating Combat Text
                 for (let i = floatingTexts.length - 1; i >= 0; i--) {
                     let ft = floatingTexts[i];
                     ft.y += ft.vy;
@@ -982,7 +975,6 @@
                     if (ft.life <= 0) floatingTexts.splice(i, 1);
                 }
 
-                // Speech Bubbles
                 if (gameState.speechBubbles) {
                     gameState.speechBubbles.forEach(sb => {
                         ctx.font = 'bold 14px Arial';
