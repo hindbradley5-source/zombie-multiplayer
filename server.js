@@ -47,9 +47,10 @@ function generatePartyCode() {
     return code;
 }
 
-function makePlayer(stats, x, y) {
+function makePlayer(stats, x, y, name = 'Survivor') {
     return {
         x, y,
+        name: name || 'Survivor',
         aimAngle: 0,
         size: 38,
         hp: stats.maxHp,
@@ -63,6 +64,7 @@ function makePlayer(stats, x, y) {
         dashCooldown: 0,
         skillCooldown: 0,
         maxSkillCooldown: 300,
+        ultCharge: 0,
         powerUpType: null,
         powerUpTimer: 0,
         perks: [],
@@ -119,17 +121,19 @@ io.on('connection', (socket) => {
 
     socket.emit('leaderboardUpdate', leaderboard);
 
-    socket.on('startSoloGame', (playerClass) => {
+    socket.on('startSoloGame', (data) => {
+        const pClass = typeof data === 'object' ? data.class : data;
+        const pName = typeof data === 'object' ? data.name : 'Survivor';
         const code = 'SOLO_' + Math.floor(1000 + Math.random() * 9000);
-        const pClass = playerClass && classData[playerClass] ? playerClass : 'marksman';
+        const validClass = pClass && classData[pClass] ? pClass : 'marksman';
         rooms[code] = createRoomObject(false);
         socket.roomCode = code;
         socket.join(code);
 
-        const stats = classData[pClass];
-        rooms[code].players[socket.id] = makePlayer(stats, ARENA_CENTER_X, ARENA_CENTER_Y);
-        rooms[code].players[socket.id].class = pClass;
-        rooms[code].players[socket.id].baseClass = pClass;
+        const stats = classData[validClass];
+        rooms[code].players[socket.id] = makePlayer(stats, ARENA_CENTER_X, ARENA_CENTER_Y, pName);
+        rooms[code].players[socket.id].class = validClass;
+        rooms[code].players[socket.id].baseClass = validClass;
 
         for (let i = 0; i < 10; i++) {
             let angle = Math.random() * Math.PI * 2;
@@ -141,17 +145,19 @@ io.on('connection', (socket) => {
         socket.emit('gameStarted');
     });
 
-    socket.on('startBossRush', (playerClass) => {
+    socket.on('startBossRush', (data) => {
+        const pClass = typeof data === 'object' ? data.class : data;
+        const pName = typeof data === 'object' ? data.name : 'Survivor';
         const code = 'BOSSRUSH_' + Math.floor(1000 + Math.random() * 9000);
-        const pClass = playerClass && classData[playerClass] ? playerClass : 'marksman';
+        const validClass = pClass && classData[pClass] ? pClass : 'marksman';
         rooms[code] = createRoomObject(true);
         socket.roomCode = code;
         socket.join(code);
 
-        const stats = classData[pClass];
-        rooms[code].players[socket.id] = makePlayer(stats, ARENA_CENTER_X, ARENA_CENTER_Y);
-        rooms[code].players[socket.id].class = pClass;
-        rooms[code].players[socket.id].baseClass = pClass;
+        const stats = classData[validClass];
+        rooms[code].players[socket.id] = makePlayer(stats, ARENA_CENTER_X, ARENA_CENTER_Y, pName);
+        rooms[code].players[socket.id].class = validClass;
+        rooms[code].players[socket.id].baseClass = validClass;
         rooms[code].players[socket.id].money = 600;
 
         for (let i = 0; i < 10; i++) {
@@ -164,7 +170,42 @@ io.on('connection', (socket) => {
         socket.emit('gameStarted');
     });
 
-    socket.on('createParty', () => {
+    socket.on('restartGame', () => {
+        const room = rooms[socket.roomCode];
+        if (!room) return;
+        const pClass = room.players[socket.id] ? room.players[socket.id].class : 'marksman';
+        const pName = room.players[socket.id] ? room.players[socket.id].name : 'Survivor';
+        const isBossRush = room.isBossRush;
+        
+        rooms[socket.roomCode] = createRoomObject(isBossRush);
+        const stats = classData[pClass];
+        rooms[socket.roomCode].players[socket.id] = makePlayer(stats, ARENA_CENTER_X, ARENA_CENTER_Y, pName);
+        rooms[socket.roomCode].players[socket.id].class = pClass;
+        rooms[socket.roomCode].players[socket.id].baseClass = pClass;
+        if (isBossRush) rooms[socket.roomCode].players[socket.id].money = 600;
+
+        for (let i = 0; i < 10; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let dist  = Math.random() * (ARENA_RADIUS - 300);
+            rooms[socket.roomCode].barrels.push({ x: ARENA_CENTER_X + Math.cos(angle) * dist, y: ARENA_CENTER_Y + Math.sin(angle) * dist, hp: 50, maxHp: 50, size: 35 });
+        }
+
+        socket.emit('gameStarted');
+    });
+
+    socket.on('leaveRoom', () => {
+        if (socket.roomCode && rooms[socket.roomCode]) {
+            delete rooms[socket.roomCode].players[socket.id];
+            if (Object.keys(rooms[socket.roomCode].players).length === 0) {
+                delete rooms[socket.roomCode];
+            }
+            socket.leave(socket.roomCode);
+            socket.roomCode = null;
+        }
+        socket.emit('leftRoom');
+    });
+
+    socket.on('createParty', (pName) => {
         const code = generatePartyCode();
         rooms[code] = createRoomObject(false);
         rooms[code].gameStarted = false;
@@ -172,7 +213,7 @@ io.on('connection', (socket) => {
         socket.roomCode = code;
         socket.join(code);
 
-        rooms[code].players[socket.id] = makePlayer(classData['marksman'], ARENA_CENTER_X, ARENA_CENTER_Y);
+        rooms[code].players[socket.id] = makePlayer(classData['marksman'], ARENA_CENTER_X, ARENA_CENTER_Y, pName || 'Survivor');
 
         for (let i = 0; i < 10; i++) {
             let angle = Math.random() * Math.PI * 2;
@@ -184,7 +225,9 @@ io.on('connection', (socket) => {
         io.to(code).emit('lobbyUpdate', rooms[code].players);
     });
 
-    socket.on('joinParty', (code) => {
+    socket.on('joinParty', (data) => {
+        const code = typeof data === 'object' ? data.code : data;
+        const pName = typeof data === 'object' ? data.name : 'Survivor';
         const upperCode = code ? code.trim().toUpperCase() : '';
         if (rooms[upperCode] && !rooms[upperCode].gameStarted) {
             socket.roomCode = upperCode;
@@ -193,7 +236,8 @@ io.on('connection', (socket) => {
                 rooms[upperCode].players[socket.id] = makePlayer(
                     classData['marksman'],
                     ARENA_CENTER_X + (Math.random() * 40 - 20),
-                    ARENA_CENTER_Y + (Math.random() * 40 - 20)
+                    ARENA_CENTER_Y + (Math.random() * 40 - 20),
+                    pName
                 );
             }
             socket.emit('partyJoined', upperCode);
@@ -203,12 +247,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('selectClass', (playerClass) => {
+    socket.on('selectClass', (data) => {
         const room = rooms[socket.roomCode];
         if (!room || room.gameStarted) return;
+        const playerClass = typeof data === 'object' ? data.class : data;
+        const playerName = typeof data === 'object' ? data.name : null;
         const stats = classData[playerClass];
         if (!stats || !room.players[socket.id]) return;
         const p = room.players[socket.id];
+        if (playerName) p.name = playerName;
         Object.assign(p, {
             class: playerClass, baseClass: playerClass,
             color: stats.color, speed: stats.speed,
@@ -282,6 +329,63 @@ io.on('connection', (socket) => {
             hp: 500,
             maxHp: 500
         });
+    });
+
+    socket.on('useUltimate', () => {
+        const room = rooms[socket.roomCode];
+        if (!room || !room.gameStarted || room.gameOver) return;
+        const p = room.players[socket.id];
+        if (!p || p.hp <= 0 || (p.ultCharge || 0) < 100) return;
+
+        p.ultCharge = 0;
+        const pX = p.x + p.size / 2;
+        const pY = p.y + p.size / 2;
+
+        if (p.class === 'paladin') { // DIVINE JUDGEMENT
+            io.to(socket.roomCode).emit('killstreak', { player: p.name, title: '⚡ DIVINE JUDGEMENT!' });
+            room.zombies.forEach(z => {
+                room.explosions.push({ x: z.x + z.size/2, y: z.y + z.size/2, radius: 180, life: 25, isHoly: true });
+                z.hp -= 950;
+                p.totalDamage += 950;
+            });
+        } else if (p.class === 'marksman') { // NIGHTHAWK BARRAGE
+            io.to(socket.roomCode).emit('killstreak', { player: p.name, title: '🚀 NIGHTHAWK BARRAGE!' });
+            for (let i = 0; i < 24; i++) {
+                const angle = (i / 24) * Math.PI * 2;
+                room.bullets.push({ x: pX, y: pY, dx: Math.cos(angle), dy: Math.sin(angle), speed: 22, size: 12, damage: 350, owner: socket.id, life: 80 });
+            }
+        } else if (p.class === 'mage') { // SUPERNOVA
+            io.to(socket.roomCode).emit('killstreak', { player: p.name, title: '🌌 SUPERNOVA!' });
+            room.explosions.push({ x: pX, y: pY, radius: 600, life: 30, isFreezeBeam: true });
+            room.zombies.forEach(z => {
+                if (Math.hypot((z.x + z.size/2) - pX, (z.y + z.size/2) - pY) < 600) {
+                    z.frozenTimer = 180;
+                    z.hp -= 800;
+                    p.totalDamage += 800;
+                }
+            });
+        } else if (p.class === 'melee') { // BLADE TORNADO
+            io.to(socket.roomCode).emit('killstreak', { player: p.name, title: '🌪️ BLADE TORNADO!' });
+            p.hasForceField = true;
+            setTimeout(() => { if (p) p.hasForceField = false; }, 4000);
+            room.explosions.push({ x: pX, y: pY, radius: 350, life: 25, isWhirlwind: true });
+            room.zombies.forEach(z => {
+                if (Math.hypot((z.x + z.size/2) - pX, (z.y + z.size/2) - pY) < 350) {
+                    z.hp -= 1200;
+                    p.totalDamage += 1200;
+                }
+            });
+        } else if (p.class === 'necromancer') { // ARMY OF THE DEAD
+            io.to(socket.roomCode).emit('killstreak', { player: p.name, title: '☠️ ARMY OF THE DEAD!' });
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                room.minions.push({
+                    x: pX + Math.cos(angle) * 60,
+                    y: pY + Math.sin(angle) * 60,
+                    size: 28, hp: 300, maxHp: 300, damage: 95, life: 600, owner: socket.id
+                });
+            }
+        }
     });
 
     socket.on('move', (input) => {
@@ -555,6 +659,7 @@ io.on('connection', (socket) => {
                         if (z.hp <= 0 && !z.rewarded) {
                             z.rewarded = true;
                             p.totalKills++;
+                            p.ultCharge = Math.min(100, (p.ultCharge || 0) + 5);
                             p.hp = Math.min(p.maxHp, p.hp + (p.perks.includes('vampirism') ? 4 : 0));
                             
                             room.bloodSplatters.push({ x: z.x + z.size/2, y: z.y + z.size/2, radius: z.size/2 + Math.random()*15 });
@@ -724,8 +829,9 @@ setInterval(() => {
             if (!room.gameOver) {
                 room.gameOver = true;
                 let topKills = 0;
-                playerList.forEach(p => { if (p.totalKills > topKills) topKills = p.totalKills; });
-                updateLeaderboard('Survivor Squad', room.wave, topKills);
+                let survivorName = 'Survivor Squad';
+                playerList.forEach(p => { if (p.totalKills > topKills) { topKills = p.totalKills; survivorName = p.name; } });
+                updateLeaderboard(survivorName, room.wave, topKills);
                 io.emit('leaderboardUpdate', leaderboard);
             }
         }
@@ -1052,6 +1158,7 @@ setInterval(() => {
                         
                         if (shooter) {
                             shooter.totalKills++;
+                            shooter.ultCharge = Math.min(100, (shooter.ultCharge || 0) + 5);
                             shooter.hp = Math.min(shooter.maxHp, shooter.hp + (shooter.perks.includes('vampirism') ? 4 : 0));
 
                             if (nowTime - shooter.lastKillTime < 2500) shooter.recentKills++;
@@ -1061,7 +1168,7 @@ setInterval(() => {
                             if (shooter.recentKills >= 2) {
                                 const streakNames = { 2: 'DOUBLE KILL!', 3: 'TRIPLE KILL!', 4: 'QUAD KILL!', 5: 'RAMPAGE!' };
                                 const title = streakNames[shooter.recentKills] || 'ZOMBIE SLAYER!';
-                                io.to(code).emit('killstreak', { player: shooter.avatar, title });
+                                io.to(code).emit('killstreak', { player: shooter.name, title });
                                 shooter.money += 25 * shooter.recentKills;
                             }
                         }
@@ -1097,7 +1204,7 @@ setInterval(() => {
                     if (c.type === 'nuke') {
                         room.explosions.push({ x: ARENA_CENTER_X, y: ARENA_CENTER_Y, radius: 1500, life: 30, isNuke: true });
                         room.zombies.forEach(z => z.hp = 0);
-                        io.to(code).emit('killstreak', { player: p.avatar, title: '☢️ TACTICAL NUKE LAUNCHED!' });
+                        io.to(code).emit('killstreak', { player: p.name, title: '☢️ TACTICAL NUKE LAUNCHED!' });
                     } else {
                         p.weaponType = c.type;
                         p.damage = c.type === 'flamethrower' ? 60 : 180;
