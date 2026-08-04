@@ -384,7 +384,7 @@
         <!-- Low HP Red Vignette Warning -->
         <div id="vignette"></div>
 
-        <!-- Sleek HUD Top Left -->
+        <!-- HUD Top Left -->
         <div id="hud" class="hidden">
             <div class="hud-card">
                 <div class="hud-label">Wave <span id="wave-display" style="color:var(--accent-gold);">1</span></div>
@@ -421,11 +421,10 @@
             <button id="in-game-menu-btn" class="hidden" onclick="goToMainMenu()">Main Menu</button>
         </div>
 
-        <!-- Refined Full-Screen Shop Overlay -->
+        <!-- Shop Overlay -->
         <div id="shop" class="hidden">
             <div class="shop-header">
                 <h2>🛒 ARMORY & UPGRADES</h2>
-                <!-- Money display inside the shop -->
                 <div style="font-size: 18px; font-weight: 800; color: var(--accent-green); margin-top: 6px;">
                     Balance: $<span id="shop-money-display">0</span>
                 </div>
@@ -435,7 +434,6 @@
             
             <div class="shop-container">
                 <div class="shop-categories">
-                    <!-- Stat Upgrades -->
                     <div>
                         <div class="shop-section-title">Field Upgrades</div>
                         <div class="shop-grid">
@@ -443,12 +441,10 @@
                             <button onclick="buyItem('maxHealth')" onmouseover="showTip('Armor Plating', 'Increases total maximum health capacity permanently.', '+10% Max HP', '120')" onmouseleave="clearTip()">+10% Max HP <span class="price-badge">$120</span></button>
                             <button onclick="buyItem('damage')" onmouseover="showTip('Sharpened Rounds', 'Permanently boosts damage output across all weapons.', '+1% Damage', '100')" onmouseleave="clearTip()">+1% Damage <span class="price-badge">$100</span></button>
                             <button onclick="buyItem('speed')" onmouseover="showTip('Tactical Boots', 'Increases base player movement speed.', '+1% Speed', '75')" onmouseleave="clearTip()">+1% Speed <span class="price-badge">$75</span></button>
-                            <!-- New +1% Money Gain Upgrade -->
                             <button onclick="buyItem('moneyGain')" onmouseover="showTip('Bounty Hunter', 'Increases all money gained from kills and wave clear bonuses by +1%.', '+1% Gold Gain', '100')" onmouseleave="clearTip()">+1% Gold Gain <span class="price-badge">$100</span></button>
                         </div>
                     </div>
 
-                    <!-- Arsenal Weapons -->
                     <div>
                         <div class="shop-section-title">Weaponry & Arcana</div>
                         <div class="shop-grid">
@@ -461,7 +457,6 @@
                         </div>
                     </div>
 
-                    <!-- Class Swap & Ultimate -->
                     <div>
                         <div class="shop-section-title">Class Specs & Ultimate</div>
                         <div class="shop-grid">
@@ -473,7 +468,6 @@
                     </div>
                 </div>
 
-                <!-- Hover Tooltip Box -->
                 <div id="tooltip-box">
                     <h4>Armory Intel</h4>
                     <p id="tip-desc" style="color: #8a8a9e; font-size: 13px; margin: 0 0 12px 0; line-height: 1.4;">Hover over any weapon or upgrade item to view base damage, attack speeds, and specifications.</p>
@@ -533,12 +527,21 @@
             </div>
         </div>
 
-        <!-- Death Screen -->
+        <!-- Single Player Death Screen (Waiting for next round) -->
         <div id="death-screen" class="screen hidden">
             <h2 style="color: var(--accent-red); font-size: 52px; margin-bottom: 5px; text-shadow: 0 0 30px rgba(231,76,60,0.6); font-weight: 900;">YOU DIED</h2>
-            <p style="color: #aaa; font-size: 18px; margin-bottom: 25px;">The horde overwhelmed your defenses.</p>
-            <button onclick="respawnPlayer()" style="background: linear-gradient(135deg, #e67e22, #d35400); font-size: 18px; box-shadow: 0 4px 20px rgba(230,126,34,0.6); padding: 14px 32px;">Respawn</button>
-            <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); box-shadow: none; font-size: 15px; margin-top: 15px;">Main Menu</button>
+            <p style="color: #aaa; font-size: 18px; margin-bottom: 25px;">You will automatically respawn when the current round ends.</p>
+            <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); box-shadow: none; font-size: 15px;">Main Menu</button>
+        </div>
+
+        <!-- Game Over Screen (All Players Dead) -->
+        <div id="game-over-screen" class="screen hidden">
+            <h2 style="color: var(--accent-red); font-size: 56px; margin-bottom: 5px; text-shadow: 0 0 35px rgba(231,76,60,0.8); font-weight: 900;">GAME OVER</h2>
+            <p style="color: #bbb; font-size: 18px; margin-bottom: 30px;">All team members were eliminated!</p>
+            <div style="display: flex; gap: 15px;">
+                <button onclick="retryGame()" style="background: linear-gradient(135deg, #27ae60, #1e8449); font-size: 16px; padding: 12px 28px;">⚡ Retry Match</button>
+                <button onclick="goToMainMenu()" style="background: rgba(255,255,255,0.1); font-size: 16px; padding: 12px 28px;">Main Menu</button>
+            </div>
         </div>
     </div>
 
@@ -549,6 +552,7 @@
         const mainMenu = document.getElementById('main-menu');
         const lobbyScreen = document.getElementById('lobby-screen');
         const deathScreen = document.getElementById('death-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
         const hud = document.getElementById('hud');
         const shop = document.getElementById('shop');
         const inGameMenuBtn = document.getElementById('in-game-menu-btn');
@@ -569,7 +573,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], speechBubbles: [], wave: 1, waveActive: false, shopTimer: 30 };
+        let gameState = { players: {}, bullets: [], zombies: [], pickups: [], barrels: [], explosions: [], speechBubbles: [], wave: 1, waveActive: false, shopTimer: 30, gameOver: false };
         let selectedAvatarSymbol = '🤠';
         let isDead = false;
 
@@ -625,7 +629,7 @@
         }
         function startGame() { socket.emit('startGame'); }
         function startWaveEarly() { socket.emit('startWaveEarly'); }
-        function respawnPlayer() { socket.emit('respawn'); }
+        function retryGame() { socket.emit('retryGame'); }
         function buyItem(item) { socket.emit('buy', item); }
         function goToMainMenu() { 
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -698,9 +702,17 @@
             let mapNames = ["Apocalypse City", "Wild West Canyon", "Cyber Neon City", "Alien Wasteland"];
             document.getElementById('map-display').innerText = mapNames[mapIndex % mapNames.length];
 
+            // Game Over Check
+            if (gameState.gameOver) {
+                gameOverScreen.classList.remove('hidden');
+                deathScreen.classList.add('hidden');
+                shop.classList.add('hidden');
+            } else {
+                gameOverScreen.classList.add('hidden');
+            }
+
             let me = gameState.players[socket.id];
             if (me) {
-                // Update Money in HUD and inside Shop Header
                 document.getElementById('money-display').innerText = me.money;
                 document.getElementById('shop-money-display').innerText = me.money;
 
@@ -722,14 +734,15 @@
                 }
                 lastHp[socket.id] = me.hp;
 
-                if (me.hp <= 0 && !isDead) {
-                    isDead = true;
-                    deathScreen.classList.remove('hidden');
-                    inGameMenuBtn.classList.add('hidden');
-                } else if (me.hp > 0 && isDead) {
-                    isDead = false;
-                    deathScreen.classList.add('hidden');
-                    inGameMenuBtn.classList.remove('hidden');
+                // Death screen handling when individual player dies vs all players
+                if (!gameState.gameOver) {
+                    if (me.hp <= 0 && !isDead) {
+                        isDead = true;
+                        deathScreen.classList.remove('hidden');
+                    } else if (me.hp > 0 && isDead) {
+                        isDead = false;
+                        deathScreen.classList.add('hidden');
+                    }
                 }
 
                 let weaponName = me.weaponType ? me.weaponType.toUpperCase() : '';
@@ -746,7 +759,7 @@
                 }
             }
 
-            if (!gameState.waveActive) {
+            if (!gameState.waveActive && !gameState.gameOver) {
                 shop.classList.remove('hidden');
             } else {
                 shop.classList.add('hidden');
