@@ -72,6 +72,7 @@ function makePlayer(stats, x, y, name = 'Survivor') {
         totalDamage: 0,
         recentKills: 0,
         lastKillTime: 0,
+        lastDamageTime: Date.now(),
         ...stats
     };
 }
@@ -95,6 +96,8 @@ function createRoomObject(isBossRush = false) {
         damageTexts: [],
         fireTrails: [],
         acidPools: [],
+        slashArcs: [],
+        lightningBeams: [],
         wave: 1,
         zombiesToSpawn: isBossRush ? 3 : 8,
         totalZombiesThisWave: isBossRush ? 3 : 8,
@@ -204,6 +207,18 @@ io.on('connection', (socket) => {
             socket.roomCode = null;
         }
         socket.emit('leftRoom');
+    });
+
+    socket.on('quickHeal', () => {
+        const room = rooms[socket.roomCode];
+        if (!room || room.gameOver) return;
+        const p = room.players[socket.id];
+        if (!p || p.hp <= 0) return;
+        if (p.money >= 50 && p.hp < p.maxHp) {
+            p.money -= 50;
+            p.hp = p.maxHp;
+            room.damageTexts.push({ x: p.x + p.size/2, y: p.y, text: '+HEALED', color: '#22c55e', life: 30 });
+        }
     });
 
     socket.on('sendPing', (msg) => {
@@ -863,6 +878,11 @@ setInterval(() => {
             if ((p.class === 'mage' || p.class === 'necromancer') && p.mana < p.maxMana && p.hp > 0) p.mana = Math.min(p.maxMana, p.mana + 0.6);
             if (p.powerUpTimer > 0) { p.powerUpTimer--; if (p.powerUpTimer === 0) p.powerUpType = null; }
             if (p.skillCooldown > 0) p.skillCooldown--;
+
+            // Out-of-Combat Passive HP Regeneration (1 HP/sec after 8s)
+            if (p.hp > 0 && p.hp < p.maxHp && (nowTime - (p.lastDamageTime || 0)) > 8000) {
+                p.hp = Math.min(p.maxHp, p.hp + 0.033);
+            }
         }
 
         if (room.isBossRush) {
@@ -1012,6 +1032,7 @@ setInterval(() => {
                 const p = room.players[id];
                 if (p.hp > 0 && Math.hypot((p.x + p.size/2) - ap.x, (p.y + p.size/2) - ap.y) < ap.radius) {
                     p.hp -= 0.15;
+                    p.lastDamageTime = nowTime;
                 }
             }
         });
@@ -1041,6 +1062,7 @@ setInterval(() => {
                                 const dist = Math.hypot((p.x + p.size/2) - zX, (p.y + p.size/2) - zY);
                                 if (dist < 250) {
                                     p.hp -= 15;
+                                    p.lastDamageTime = nowTime;
                                     const pushAngle = Math.atan2((p.y + p.size/2) - zY, (p.x + p.size/2) - zX);
                                     p.x += Math.cos(pushAngle) * 90;
                                     p.y += Math.sin(pushAngle) * 90;
@@ -1104,6 +1126,7 @@ setInterval(() => {
                         z.y -= Math.sin(angle) * 35;
                     } else {
                         closest.hp -= (z.type === 'boss' ? 6 : 1);
+                        closest.lastDamageTime = nowTime;
                         if (closest.perks.includes('thornArmor')) {
                             z.hp -= (z.type === 'boss' ? 30 : 15);
                         }
