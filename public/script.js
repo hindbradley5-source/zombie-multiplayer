@@ -25,11 +25,11 @@ let lastAutoFireTime = 0;
 
 // 📱 Mobile detection
 const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth < 900;
-// Zoom: mobile gets 2× so player/map are visible; desktop stays 1×
-let cameraZoom = isMobile ? 2.0 : 1.0;
-// Track zoom on resize (portrait vs landscape)
+// No zoom on mobile — same view as desktop
+let cameraZoom = 1.0;
+// Keep at 1.0 on all screen sizes
 window.addEventListener('resize', () => {
-    cameraZoom = (window.innerWidth < 900) ? 2.0 : 1.0;
+    cameraZoom = 1.0;
 });
 
 // 🎯 Unified aim angle — updated from mouse (desktop) or right joystick (mobile)
