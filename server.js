@@ -701,6 +701,7 @@ io.on('connection', (socket) => {
                             if (room.bloodSplatters.length > 80) room.bloodSplatters.shift();
 
                             const baseReward = (z.type === 'boss' ? 800 : 35) * (room.environmentalEvent === 'bloodMoon' ? 2.5 : 1);
+                            // Bug Fix: separate melee killer reward from global distribution to avoid double-counting
                             // 💸 Global shared cash for ALL players in the room!
                             for (let id in room.players) {
                                 const recipient = room.players[id];
@@ -827,12 +828,12 @@ setInterval(() => {
 
         const playerList = Object.values(room.players);
         
-        playerList.forEach(p => {
-            if (p.hp <= 0 && !room.reviveBeacons.some(b => b.targetPlayerId === p.socketId)) {
+        Object.entries(room.players).forEach(([id, p]) => {
+            if (p.hp <= 0 && !room.reviveBeacons.some(b => b.targetPlayerId === id)) {
                 room.reviveBeacons.push({
                     x: p.x + p.size/2,
                     y: p.y + p.size/2,
-                    targetPlayerId: p.socketId,
+                    targetPlayerId: id,
                     progress: 0,
                     maxProgress: 90
                 });
@@ -1046,7 +1047,8 @@ setInterval(() => {
             }
 
             if (z.type === 'boss') {
-                if (z.hp / z.maxHp < 0.5 && !z.isBerserk) {
+                // Bug Fix: guard against zero/undefined maxHp on boss berserk trigger
+                if (z.maxHp > 0 && (z.hp / z.maxHp) < 0.5 && !z.isBerserk) {
                     z.isBerserk = true;
                     z.speed *= 1.4;
                 }
@@ -1252,7 +1254,20 @@ setInterval(() => {
                 if (Math.hypot((p.x + p.size/2) - c.x, (p.y + p.size/2) - c.y) < 45) {
                     if (c.type === 'nuke') {
                         room.explosions.push({ x: ARENA_CENTER_X, y: ARENA_CENTER_Y, radius: 1500, life: 30, isNuke: true });
-                        room.zombies.forEach(z => z.hp = 0);
+                        // Bug Fix: award kill cash + kills for nuke wipe; mark rewarded to avoid double-reward
+                        room.zombies.forEach(z => {
+                            if (!z.rewarded) {
+                                z.rewarded = true;
+                                p.totalKills++;
+                                p.ultCharge = Math.min(100, (p.ultCharge || 0) + 5);
+                                const nukeReward = (z.type === 'boss' ? 800 : 35) * (room.environmentalEvent === 'bloodMoon' ? 2.5 : 1);
+                                for (let rid in room.players) {
+                                    const r = room.players[rid];
+                                    if (r) r.money += Math.round(nukeReward * (r.moneyGainMultiplier || 1.0));
+                                }
+                            }
+                            z.hp = 0;
+                        });
                         io.to(code).emit('killstreak', { player: p.name, title: '☢️ TACTICAL NUKE LAUNCHED!' });
                     } else {
                         p.weaponType = c.type;
